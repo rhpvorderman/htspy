@@ -43,7 +43,6 @@ static PyMemberDef BamRecord_members[] = {
     {"next_pos", T_INT, offsetof(BamRecord, next_pos), READONLY},
     {"pnext", T_INT, offsetof(BamRecord, next_pos), READONLY}, // SAM name for next pos.
     {"tlen", T_INT, offsetof(BamRecord, tlen), READONLY},
-    {"read_name", T_OBJECT_EX, offsetof(BamRecord, read_name), 0},
     {"cigar", T_OBJECT_EX, offsetof(BamRecord, cigar), READONLY},
     {"seq", T_OBJECT_EX, offsetof(BamRecord, seq), READONLY},
     {"qual", T_OBJECT_EX, offsetof(BamRecord, qual), READONLY},
@@ -55,23 +54,13 @@ static PyMemberDef BamRecord_members[] = {
 static inline Py_ssize_t BamRecord_size(BamRecord * self) {
     // self->l_read_name in the struct should be updated as users can assign 
     // another object to self->read_name
-    Py_ssize_t read_name_size = PyBytes_Size(self->read_name);
-    if (read_name_size == -1){
-        PyErr_SetString(PyExc_TypeError, "read_name should be a bytes object.");
-        return -1;
-    }
-    if (read_name_size > 254) {
-        PyErr_SetString(PyExc_ValueError, 
-            "read_name may not be larger than 254 characters.");
-        return -1;
-    }
-    self->l_read_name = (uint8_t)read_name_size + 1;  // +1 for NULL terminator.
     Py_ssize_t tags_length = PyBytes_Size(self->tags);
     if (tags_length == -1){
         PyErr_SetString(PyExc_TypeError, "tags should be a bytes object.");
         return -1;
     }
-    // The rest of the attribute is readonly so the sizes in the stuct are correct.
+    // self->l_read_name is guaranteed to be correct by the getter and setter.
+    // The rest of the attributes are readonly so the sizes in the stuct are correct.
     return BAM_PROPERTIES_STRUCT_SIZE +           // All struct integer sizes
            self->l_read_name +                    // Length of read_name + 1 (NUL)
            self->n_cigar_op * sizeof(uint32_t) +  // Length of cigar string
@@ -81,6 +70,13 @@ static inline Py_ssize_t BamRecord_size(BamRecord * self) {
 }
 
 // PROPERTIES
+
+PyDoc_STRVAR(BamRecord_qname_doc,
+"The name of the aligned read as a string.\n"
+"WARNING: this attribute is a property that converts 'read_name' \n"
+"To ASCII For faster access use the 'read_name' attribute which \n"
+"is an ASCII-encoded bytes object.");
+
 static PyObject * BamRecord_get_qname(BamRecord * self, void* closure) {
     return PyUnicode_FromEncodedObject(self->read_name, "ascii", "strict");
 }
@@ -92,7 +88,7 @@ static int BamRecord_set_qname(BamRecord * self, PyObject * new_qname, void* clo
     Py_ssize_t read_name_size = PyBytes_GET_SIZE(new_read_name);
     if (read_name_size > 254) {
         PyErr_SetString(PyExc_ValueError, 
-            "BamRecord.read_name may not be larger than 254 characters.");
+            "read_name may not be larger than 254 characters.");
         Py_DecRef(new_read_name);
         return -1;
     }
@@ -101,14 +97,35 @@ static int BamRecord_set_qname(BamRecord * self, PyObject * new_qname, void* clo
     return 0;
 }
 
-PyDoc_STRVAR(BamRecord_qname_doc,
-"The name of the aligned read as a string.\n"
-"WARNING: this attribute is a property that converts 'read_name' \n"
-"To ASCII For faster access use the 'read_name' attribute which \n"
-"is an ASCII-encoded bytes object.");
+PyDoc_STRVAR(BamRecord_read_name_doc,
+"The name of the aligned read as an ASCII encoded bytes object.\n");
+
+static PyObject * BamRecord_get_read_name(BamRecord * self, void* closure) {
+    return self->read_name;
+}
+
+static int BamRecord_set_read_name(BamRecord * self, PyObject * new_read_name, void* closure) {
+    if (!PyBytes_CheckExact(new_read_name)){
+        PyErr_SetString(PyExc_TypeError, "read_name must be a bytes object");
+        return -1;
+    }
+    Py_ssize_t read_name_size = PyBytes_GET_SIZE(new_read_name);
+    if (read_name_size > 254) {
+        PyErr_SetString(PyExc_ValueError, 
+            "read_name may not be larger than 254 characters.");
+        return -1;
+    }
+    Py_IncRef(new_read_name);
+    self->read_name = new_read_name;
+    self->l_read_name = (uint8_t)read_name_size + 1;
+    return 0;
+}
 
 static PyGetSetDef BamRecord_properties[] = {
-    {"qname", (getter)BamRecord_get_qname, (setter)BamRecord_set_qname, BamRecord_qname_doc, NULL},
+    {"qname", (getter)BamRecord_get_qname, (setter)BamRecord_set_qname, 
+     BamRecord_qname_doc, NULL},
+    {"read_name", (getter)BamRecord_get_read_name, (setter)BamRecord_set_read_name,
+     BamRecord_read_name_doc, NULL},
     {NULL}
 };
 
