@@ -34,7 +34,6 @@ BamRecord_dealloc(BamRecord *self) {
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
-
 static PyMemberDef BamRecord_members[] = {
     {"read_name", T_OBJECT_EX, offsetof(BamRecord, read_name), 0},
     {"flag", T_USHORT, offsetof(BamRecord, flag), READONLY},
@@ -50,6 +49,29 @@ static PyMemberDef BamRecord_members[] = {
     {NULL}
 };
 
+static PyObject * BamRecord_get_qname(BamRecord * self, void* closure) {
+    return PyUnicode_FromEncodedObject(self->read_name, "ascii", "strict");
+}
+
+static int BamRecord_set_qname(BamRecord * self, PyObject * new_qname, void* closure) {
+    PyObject * new_read_name = PyUnicode_AsASCIIString(new_qname);
+    if (new_read_name == NULL)
+        return -1;
+    self->read_name = new_read_name;
+    return 0;
+}
+
+PyDoc_STRVAR(BamRecord_qname_doc,
+"The name of the aligned read as a string.\n"
+"WARNING: this attribute is a property that converts 'read_name' \n"
+"To ASCII For faster access use the 'read_name' attribute which \n"
+"is an ASCII-encoded bytes object.");
+
+static PyGetSetDef BamRecord_properties[] = {
+    {"qname", (getter)BamRecord_get_qname, (setter)BamRecord_set_qname, BamRecord_qname_doc, NULL},
+    {NULL}
+};
+
 static PyMethodDef BamRecord_methods[] = {
     {NULL}
 };
@@ -59,8 +81,8 @@ PyDoc_STRVAR(BamRecord__doc__,
 
 static PyTypeObject BamRecord_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "_bamrecord.BamRecord",      /* tp_name */
-    sizeof(BamRecord),          /* tp_basicsize */
+    "_bamrecord.BamRecord",             /* tp_name */
+    sizeof(BamRecord),                  /* tp_basicsize */
     0,                                  /* tp_itemsize */
     (destructor)BamRecord_dealloc,      /* tp_dealloc */
     0,                                  /* tp_vectorcall_offset */
@@ -87,7 +109,7 @@ static PyTypeObject BamRecord_Type = {
     0,                                  /* tp_iternext */
     BamRecord_methods,                  /* tp_methods */
     BamRecord_members,                  /* tp_members */
-    0,                                  /* tp_getset */
+    BamRecord_properties,               /* tp_getset */
     0,                                  /* tp_base */
     0,                                  /* tp_dict */
     0,                                  /* tp_descr_get */
