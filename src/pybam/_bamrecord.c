@@ -117,8 +117,9 @@ PyInit__sequence(void)
     if (m == NULL)
         return NULL;
 
-    Py_INCREF(BamRecord_Type);
-    if (PyModule_AddObject(m, "BamRecord",  (PyObject *)BamRecord_Type) < 0) {
+    PyObject * BamRecordType = (PyObject *)&BamRecord_Type;
+    Py_INCREF(BamRecordType);
+    if (PyModule_AddObject(m, "BamRecord", BamRecordType) < 0) {
         return NULL;
     }
     return m;

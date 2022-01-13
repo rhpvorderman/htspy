@@ -20,15 +20,7 @@
 
 from pathlib import Path
 
-from Cython.Build import cythonize
-
 from setuptools import Extension, find_packages, setup
-
-EXT_MODULES = cythonize(
-    Extension("fastq_filter.optimized_algorithms",
-              ["src/fastq_filter/optimized_algorithms.pyx"]),
-    compiler_directives=dict(language_level="3", binding=True,
-                             cdivision=True, profile=True))
 
 LONG_DESCRIPTION = Path("README.rst").read_text()
 
@@ -46,7 +38,6 @@ setup(
     packages=find_packages('src'),
     package_dir={'': 'src'},
     package_data={'pybam': ['*.pyx', '*.pyi']},
-    ext_modules=EXT_MODULES,
     url="https://github.com/rhpvorderman/pybam",
     classifiers=[
         "Programming Language :: Python :: 3 :: Only",
@@ -61,5 +52,8 @@ setup(
     python_requires=">=3.6",
     install_requires=[
         "isal"
-    ]
+    ],
+    ext_modules=[
+        Extension("pybam._bamrecord", ["src/pybam/_bamrecord.c"])
+    ],
 )
