@@ -3,6 +3,8 @@
 #include "structmember.h"         // PyMemberDef
 #include <stdint.h>
 
+# define BAM_PROPERTIES_STRUCT_SIZE 36  // The combined size of all integers in BamRecord
+
 typedef struct {
     PyObject_HEAD
     uint32_t block_size;
@@ -35,20 +37,50 @@ BamRecord_dealloc(BamRecord *self) {
 }
 
 static PyMemberDef BamRecord_members[] = {
-    {"read_name", T_OBJECT_EX, offsetof(BamRecord, read_name), 0},
-    {"flag", T_USHORT, offsetof(BamRecord, flag), READONLY},
     {"pos", T_INT, offsetof(BamRecord, pos), READONLY},
     {"mapq", T_UBYTE, offsetof(BamRecord, mapq), READONLY},
-    {"cigar", T_OBJECT_EX, offsetof(BamRecord, cigar), READONLY},
+    {"flag", T_USHORT, offsetof(BamRecord, flag), READONLY},
     {"next_pos", T_INT, offsetof(BamRecord, next_pos), READONLY},
     {"pnext", T_INT, offsetof(BamRecord, next_pos), READONLY}, // SAM name for next pos.
     {"tlen", T_INT, offsetof(BamRecord, tlen), READONLY},
+    {"read_name", T_OBJECT_EX, offsetof(BamRecord, read_name), 0},
+    {"cigar", T_OBJECT_EX, offsetof(BamRecord, cigar), READONLY},
     {"seq", T_OBJECT_EX, offsetof(BamRecord, seq), READONLY},
     {"qual", T_OBJECT_EX, offsetof(BamRecord, qual), READONLY},
     {"tags", T_OBJECT_EX, offsetof(BamRecord, tags), 0},
     {NULL}
 };
 
+
+static inline Py_ssize_t BamRecord_size(BamRecord * self) {
+    // self->l_read_name in the struct should be updated as users can assign 
+    // another object to self->read_name
+    Py_ssize_t read_name_size = PyBytes_Size(self->read_name);
+    if (read_name_size == -1){
+        PyErr_SetString(PyExc_TypeError, "read_name should be a bytes object.");
+        return -1;
+    }
+    if (read_name_size > 254) {
+        PyErr_SetString(PyExc_ValueError, 
+            "read_name may not be larger than 254 characters.");
+        return -1;
+    }
+    self->l_read_name = (uint8_t)read_name_size + 1;  // +1 for NULL terminator.
+    Py_ssize_t tags_length = PyBytes_Size(self->tags);
+    if (tags_length == -1){
+        PyErr_SetString(PyExc_TypeError, "tags should be a bytes object.");
+        return -1;
+    }
+    // The rest of the attribute is readonly so the sizes in the stuct are correct.
+    return BAM_PROPERTIES_STRUCT_SIZE +           // All struct integer sizes
+           self->l_read_name +                    // Length of read_name + 1 (NUL)
+           self->n_cigar_op * sizeof(uint32_t) +  // Length of cigar string
+           (self->l_seq + 1 / 2) +                // Length of encoded seq
+           (self->l_seq) +                        // Length of qualities
+           tags_length;                           // Length of tags
+}
+
+// PROPERTIES
 static PyObject * BamRecord_get_qname(BamRecord * self, void* closure) {
     return PyUnicode_FromEncodedObject(self->read_name, "ascii", "strict");
 }
@@ -57,7 +89,15 @@ static int BamRecord_set_qname(BamRecord * self, PyObject * new_qname, void* clo
     PyObject * new_read_name = PyUnicode_AsASCIIString(new_qname);
     if (new_read_name == NULL)
         return -1;
+    Py_ssize_t read_name_size = PyBytes_GET_SIZE(new_read_name);
+    if (read_name_size > 254) {
+        PyErr_SetString(PyExc_ValueError, 
+            "BamRecord.read_name may not be larger than 254 characters.");
+        Py_DecRef(new_read_name);
+        return -1;
+    }
     self->read_name = new_read_name;
+    self->l_read_name = (uint8_t)read_name_size + 1;
     return 0;
 }
 
@@ -72,7 +112,21 @@ static PyGetSetDef BamRecord_properties[] = {
     {NULL}
 };
 
+// METHODS
+PyDoc_STRVAR(BamRecord_as_bytes__doc__,
+"Return the BAM record as a bytesobject that can be written into a file.");
+
+#define BAMRECORD_AS_BYTES_METHODDEF    \
+    {"as_bytes", (PyCFunction)(void(*)(void))BamRecord_as_bytes, METH_NOARGS, BamRecord_as_bytes__doc__}
+
+static PyObject *
+BamRecord_as_bytes(BamRecord *self, PyObject *NoArgs){
+   return NULL;
+}
+
+
 static PyMethodDef BamRecord_methods[] = {
+    BAMRECORD_AS_BYTES_METHODDEF,
     {NULL}
 };
 
