@@ -131,11 +131,37 @@ static int BamRecord_set_read_name(BamRecord * self, PyObject * new_read_name, v
     return 0;
 }
 
+PyDoc_STRVAR(BamRecord_tags_doc,
+"The raw tags as a bytes object.");
+
+static PyObject * BamRecord_get_tags(BamRecord * self, void* closure) {
+    Py_INCREF(self->tags);
+    return self->tags;
+}
+
+static int BamRecord_set_tags(BamRecord * self, PyObject * new_tags, void* closure) {
+    if (!PyBytes_CheckExact(new_tags)){
+        PyErr_SetString(PyExc_TypeError, "tags must be a bytes object");
+        return -1;
+    }
+    Py_ssize_t new_tags_size = PyBytes_GET_SIZE(new_tags);
+    Py_ssize_t old_tags_size = PyBytes_GET_SIZE(self->tags);
+    PyObject * old_tags = self->tags;
+    Py_INCREF(new_tags);
+    self->tags = new_tags;
+    Py_DECREF(old_tags);
+    // Make sure the internal sizes are correct after updating.
+    self->block_size = self->block_size + new_tags_size - old_tags_size;
+    return 0;
+}
+
 static PyGetSetDef BamRecord_properties[] = {
     {"qname", (getter)BamRecord_get_qname, (setter)BamRecord_set_qname, 
      BamRecord_qname_doc, NULL},
     {"read_name", (getter)BamRecord_get_read_name, (setter)BamRecord_set_read_name,
      BamRecord_read_name_doc, NULL},
+    {"tags", (getter)BamRecord_get_tags, (setter)BamRecord_set_tags,
+     BamRecord_tags_doc, NULL},
     {NULL}
 };
 
