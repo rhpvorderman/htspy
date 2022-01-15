@@ -243,20 +243,7 @@ BamIterator_dealloc(BamIterator *self) {
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
-static PyObject * 
-bam_iterator(PyObject *module, PyObject * obj) {
-    BamIterator *self = PyObject_New(BamIterator, &BamIterator_Type);
-    if (!PyObject_GetBuffer(obj, &(self->view), PyBUF_SIMPLE) == 0) {
-        Py_DECREF(self);
-        return NULL;
-    }
-    self->buf = self->view.buf;
-    self->pos = 0;
-    self->len = self->view.len;
-    return self;
-}
-
-static PyObject *
+static BamIterator *
 BamIterator_iter(BamIterator *self){
     Py_INCREF(self);
     return self;
@@ -338,48 +325,46 @@ BamIterator_iternext(BamIterator *self){
     // Should be equal to start_pos + bam->record.block_size
     self->pos += tags_length;
 
-    return bam_record;
+    return (PyObject *)bam_record;
 }
 
 static PyTypeObject BamIterator_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "_bamrecord.BamIterator",           /* tp_name */
-    sizeof(BamIterator),                /* tp_basicsize */
-    0,                                  /* tp_itemsize */
-    (destructor)BamIterator_dealloc,    /* tp_dealloc */
-    0,                                  /* tp_vectorcall_offset */
-    0,                                  /* tp_getattr */
-    0,                                  /* tp_setattr */
-    0,                                  /* tp_as_async */
-    0,                                  /* tp_repr */
-    0,                                  /* tp_as_number */
-    0,                                  /* tp_as_sequence */
-    0,                                  /* tp_as_mapping */
-    0,                                  /* tp_hash  */
-    0,                                  /* tp_call */
-    0,                                  /* tp_str */
-    0,                                  /* tp_getattro */
-    0,                                  /* tp_setattro */
-    0,                                  /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
-    0,                                  /* tp_doc */
-    0,                                  /* tp_traverse */
-    0,                                  /* tp_clear */
-    0,                                  /* tp_richcompare */
-    0,                                  /* tp_weaklistoffset */
-    0,                                  /* tp_iter */
-    0,                                  /* tp_iternext */
-    0,                                  /* tp_methods */
-    0,                                  /* tp_members */
-    0,                                  /* tp_getset */
-    0,                                  /* tp_base */
-    0,                                  /* tp_dict */
-    0,                                  /* tp_descr_get */
-    0,                                  /* tp_descr_set */
-    0,                                  /* tp_dictoffset */
-    0,      /* tp_init */
-    0,                                  /* tp_alloc */
-    PyType_GenericNew,                  /* tp_new */
+    .tp_name = "_bamrecord.BamIterator", 
+    .tp_basicsize = sizeof(BamIterator),
+    .tp_dealloc =(destructor)BamIterator_dealloc,  
+    .tp_flags = Py_TPFLAGS_DEFAULT,
+    .tp_iter = (PyObject * (*)(PyObject *))BamIterator_iter,
+    .tp_iternext = (PyObject * (*)(PyObject *))BamIterator_iternext
+};
+
+PyDoc_STRVAR(bam_iterator_doc,
+"bam_iterator($module, data, /)\n"
+"--\n"
+"\n"
+"Return an iterator that yields BamRecord objects.\n"
+"\n"
+"  data\n"
+"    A block of raw BAM Record data. May be any object\n"
+"    that supports the buffer protocol: bytes, bytearray, memoryview.\n"
+);
+static PyObject * 
+bam_iterator(PyObject *module, PyObject * obj) {
+    BamIterator *self = PyObject_New(BamIterator, &BamIterator_Type);
+    if (!PyObject_GetBuffer(obj, &(self->view), PyBUF_SIMPLE) == 0) {
+        Py_DECREF(self);
+        return NULL;
+    }
+    self->buf = self->view.buf;
+    self->pos = 0;
+    self->len = self->view.len;
+    return (PyObject *)self;
+}
+
+static PyMethodDef _bamrecord_methods[] = {
+    {"bam_iterator", (PyCFunction)(void(*)(void))bam_iterator,
+     METH_O, bam_iterator_doc},
+    {NULL}
 };
 
 static struct PyModuleDef _bamrecord_module = {
@@ -387,7 +372,7 @@ static struct PyModuleDef _bamrecord_module = {
     "_bamrecord",   /* name of module */
     NULL, /* module documentation, may be NULL */
     -1,
-    NULL  /* module methods */
+    _bamrecord_methods  /* module methods */
 };
 
 
