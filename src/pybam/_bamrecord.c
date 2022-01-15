@@ -92,8 +92,12 @@ static int BamRecord_set_qname(BamRecord * self, PyObject * new_qname, void* clo
         Py_DecRef(new_read_name);
         return -1;
     }
+    PyObject * old_read_name = self->read_name;
     self->read_name = new_read_name;
+    Py_DECREF(old_read_name);
+    uint8_t old_l_read_name = self->l_read_name;
     self->l_read_name = (uint8_t)read_name_size + 1;
+    self->block_size = self->block_size + self->l_read_name - old_l_read_name;
     return 0;
 }
 
@@ -101,6 +105,7 @@ PyDoc_STRVAR(BamRecord_read_name_doc,
 "The name of the aligned read as an ASCII encoded bytes object.\n");
 
 static PyObject * BamRecord_get_read_name(BamRecord * self, void* closure) {
+    Py_INCREF(self->read_name);
     return self->read_name;
 }
 
@@ -115,9 +120,14 @@ static int BamRecord_set_read_name(BamRecord * self, PyObject * new_read_name, v
             "read_name may not be larger than 254 characters.");
         return -1;
     }
-    Py_IncRef(new_read_name);
+    PyObject * old_read_name = self->read_name;
+    Py_INCREF(new_read_name);
     self->read_name = new_read_name;
+    Py_DECREF(old_read_name);
+    // Make sure the internal sizes are correct after updating.
+    uint8_t old_l_read_name = self->l_read_name;
     self->l_read_name = (uint8_t)read_name_size + 1;
+    self->block_size = self->block_size + self->l_read_name - old_l_read_name;
     return 0;
 }
 
