@@ -26,6 +26,8 @@ typedef struct {
     PyObject * tags;
 } BamRecord;
 
+# define BAM_PROPERTIES_STRUCT_START offsetof(BamRecord, block_size)
+
 static void
 BamRecord_dealloc(BamRecord *self) {
     Py_CLEAR(self->read_name);
@@ -227,10 +229,162 @@ static PyTypeObject BamRecord_Type = {
     0,                                  /* tp_new */
 };
 
+typedef struct {
+    PyObject_HEAD 
+    Py_buffer view; 
+    char * buf;
+    Py_ssize_t pos;
+    Py_ssize_t len; 
+} BamIterator;
 
-static struct PyModuleDef _sequence_module = {
+static void
+BamIterator_dealloc(BamIterator *self) {
+    PyBuffer_Release(&(self->view));
+    Py_TYPE(self)->tp_free((PyObject *)self);
+}
+
+static PyObject * 
+bam_iterator(PyObject *module, PyObject * obj) {
+    BamIterator *self = PyObject_New(BamIterator, &BamIterator_Type);
+    if (!PyObject_GetBuffer(obj, &(self->view), PyBUF_SIMPLE) == 0) {
+        Py_DECREF(self);
+        return NULL;
+    }
+    self->buf = self->view.buf;
+    self->pos = 0;
+    self->len = self->view.len;
+    return self;
+}
+
+static PyObject *
+BamIterator_iter(BamIterator *self){
+    Py_INCREF(self);
+    return self;
+}
+
+static PyObject *
+BamIterator_iternext(BamIterator *self){
+    if (self->pos >= self->len){
+        PyErr_SetNone(PyExc_StopIteration);
+        return NULL;
+    }
+    Py_ssize_t start_pos = self->pos;
+
+    BamRecord * bam_record = PyObject_New(BamRecord, &BamRecord_Type);
+    bam_record->seq = NULL;
+    bam_record->cigar = NULL;
+    bam_record->qual = NULL;
+    bam_record->tags = NULL;
+
+    if ((self->len - self->pos) < BAM_PROPERTIES_STRUCT_SIZE) {
+        PyErr_SetString(PyExc_EOFError, "Truncated BAM record");
+        Py_DECREF(bam_record);
+        return NULL;
+    }
+    // Copy the bam file data directly into the struct.
+    memcpy((void *)bam_record + BAM_PROPERTIES_STRUCT_START, 
+            self->buf + self->pos,
+            BAM_PROPERTIES_STRUCT_SIZE);
+
+    if (self->pos + bam_record->block_size > self->len) {
+        PyErr_SetString(PyExc_EOFError, "Truncated BAM record");
+        Py_DECREF(bam_record);
+        return NULL;
+    }
+    self->pos += BAM_PROPERTIES_STRUCT_SIZE;
+    bam_record->read_name = PyBytes_FromStringAndSize(
+        self->buf + self->pos, bam_record->l_read_name -1);
+    if (bam_record->read_name == NULL) {
+        Py_DECREF(bam_record);
+        return PyErr_NoMemory();
+    }
+    self->pos += bam_record->l_read_name;
+
+    Py_ssize_t cigar_length = bam_record->n_cigar_op * sizeof(uint32_t);
+    bam_record->cigar = PyBytes_FromStringAndSize(
+        self->buf + self->pos, cigar_length);
+    if (bam_record->cigar == NULL) {
+        Py_DECREF(bam_record);
+        return PyErr_NoMemory();
+    }
+    self->pos += cigar_length;
+
+    Py_ssize_t seq_length = (bam_record->l_seq + 1) / 2;
+    bam_record->seq = PyBytes_FromStringAndSize(
+        self->buf + self->pos, seq_length);
+    if (bam_record->seq == NULL) {
+        Py_DECREF(bam_record);
+        return PyErr_NoMemory();
+    }
+    self->pos += seq_length;
+
+    bam_record->qual = PyBytes_FromStringAndSize(
+        self->buf + self->pos, bam_record->l_seq);
+    if (bam_record->qual == NULL) {
+        Py_DECREF(bam_record);
+        return PyErr_NoMemory();
+    }
+    self->pos += bam_record->l_seq;
+
+    // Tags are in the remaining block of data.
+    Py_ssize_t tags_length = start_pos + bam_record-> block_size - self->pos;
+    bam_record->tags = PyBytes_FromStringAndSize(
+        self->buf + self-> pos, tags_length);
+    if (bam_record->tags == NULL) {
+        Py_DECREF(bam_record);
+        return PyErr_NoMemory();
+    }
+
+    // Should be equal to start_pos + bam->record.block_size
+    self->pos += tags_length;
+
+    return bam_record;
+}
+
+static PyTypeObject BamIterator_Type = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "_bamrecord.BamIterator",           /* tp_name */
+    sizeof(BamIterator),                /* tp_basicsize */
+    0,                                  /* tp_itemsize */
+    (destructor)BamIterator_dealloc,    /* tp_dealloc */
+    0,                                  /* tp_vectorcall_offset */
+    0,                                  /* tp_getattr */
+    0,                                  /* tp_setattr */
+    0,                                  /* tp_as_async */
+    0,                                  /* tp_repr */
+    0,                                  /* tp_as_number */
+    0,                                  /* tp_as_sequence */
+    0,                                  /* tp_as_mapping */
+    0,                                  /* tp_hash  */
+    0,                                  /* tp_call */
+    0,                                  /* tp_str */
+    0,                                  /* tp_getattro */
+    0,                                  /* tp_setattro */
+    0,                                  /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
+    0,                                  /* tp_doc */
+    0,                                  /* tp_traverse */
+    0,                                  /* tp_clear */
+    0,                                  /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    0,                                  /* tp_iter */
+    0,                                  /* tp_iternext */
+    0,                                  /* tp_methods */
+    0,                                  /* tp_members */
+    0,                                  /* tp_getset */
+    0,                                  /* tp_base */
+    0,                                  /* tp_dict */
+    0,                                  /* tp_descr_get */
+    0,                                  /* tp_descr_set */
+    0,                                  /* tp_dictoffset */
+    0,      /* tp_init */
+    0,                                  /* tp_alloc */
+    PyType_GenericNew,                  /* tp_new */
+};
+
+static struct PyModuleDef _bamrecord_module = {
     PyModuleDef_HEAD_INIT,
-    "_sequence",   /* name of module */
+    "_bamrecord",   /* name of module */
     NULL, /* module documentation, may be NULL */
     -1,
     NULL  /* module methods */
@@ -238,11 +392,11 @@ static struct PyModuleDef _sequence_module = {
 
 
 PyMODINIT_FUNC
-PyInit__sequence(void)
+PyInit__bamrecord(void)
 {
     PyObject *m;
 
-    m = PyModule_Create(&_sequence_module);
+    m = PyModule_Create(&_bamrecord_module);
     if (m == NULL)
         return NULL;
 
