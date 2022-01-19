@@ -279,9 +279,9 @@ BamIterator_iternext(BamIterator *self){
 
     // Check if any of the bytes objects was NULL. This means there was 
     // no memory available.
-    if (bam_record->read_name == NULL | bam_record->tags == NULL |
-        bam_record->seq == NULL | bam_record->qual == NULL |
-        bam_record->tags == NULL) {
+    if ((bam_record->read_name == NULL) | (bam_record->tags == NULL) |
+        (bam_record->seq == NULL) | (bam_record->qual == NULL) |
+        (bam_record->tags == NULL)) {
         Py_DECREF(bam_record);
         return PyErr_NoMemory();
     }
