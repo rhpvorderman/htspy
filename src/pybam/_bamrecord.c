@@ -258,6 +258,7 @@ BamIterator_iternext(BamIterator *self){
     Py_ssize_t start_pos = self->pos;
 
     BamRecord * bam_record = PyObject_New(BamRecord, &BamRecord_Type);
+    bam_record->read_name = NULL;
     bam_record->seq = NULL;
     bam_record->cigar = NULL;
     bam_record->qual = NULL;
