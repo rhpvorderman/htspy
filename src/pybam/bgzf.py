@@ -34,11 +34,11 @@ class BGZFError(IOError):
 def decompress_bgzf_blocks(file: io.BufferedReader) -> Iterator[bytes]:
     while True:
         block_pos = file.tell()
-        try:
-            magic, method, flags, mtime, xfl, os = \
-                struct.unpack("<HBBIBB", file.read(10))
-        except struct.error:
-            raise BGZFError(f"Invalid bgzf block at: {block_pos}")
+        header = file.read(18)
+        if len(header) < 18:
+            raise EOFError(f"Truncated bgzf block at: {block_pos}")
+        magic, method, flags, mtime, xfl, os, xlen, si1, si2, slen, bsize = \
+            struct.unpack("<HBBIBBHBBHH", header)
         if magic != GZIP_MAGIC_INT:
             raise BGZFError(f"Invalid gzip block at: {block_pos}")
         if method != 8:  # Deflate method
@@ -47,29 +47,32 @@ def decompress_bgzf_blocks(file: io.BufferedReader) -> Iterator[bytes]:
         if not flags & 4:
             raise BGZFError(f"Gzip block should contain an extra field. "
                             f"Block starts at: {block_pos}")
-        xlen, = struct.unpack("<H", file.read(2))
         if xlen < 6:
-            raise BGZFError(f"XLEN too smal at {block_pos}")
-        si1, si2, slen, bsize = struct.unpack("<BBHH", file.read(6))
+            raise BGZFError(f"XLEN too small at {block_pos}")
         if not (si1 == 66 and si2 == 67 and slen == 2):
             raise BGZFError(f"Invalid BSIZE fields at {block_pos}")
         # Skip other xtra fields.
         file.read(xlen - 6)
         block_size = bsize + 1
         block = file.read(block_size)
-        try:
-            crc, isize = struct.unpack("<II", file.read(8))
-        except struct.error:
-            raise BGZFError(f"Truncated block. Block starts at {block_pos}")
+        if len(block) < block_size:
+            raise EOFError(f"Truncated block at: {block_pos}")
+        trailer = file.read(8)
+        if len(trailer) < 8:
+            raise EOFError(f"Truncated block at: {block_pos}")
+        crc, isize = struct.unpack("<II", trailer)
         # Decompress block, use the isize as initial buffer size to avoid
         # resizing of the buffer.
         decompressed_block = zlib.decompress(block,
-                                                  wbits=-zlib.MAX_WBITS,
-                                                  bufsize=isize)
+                                             wbits=-zlib.MAX_WBITS,
+                                             bufsize=isize)
         if crc != zlib.crc32(decompressed_block):
             raise BGZFError("Checksum fail of decompressed block")
         if isize != len(decompressed_block):
             raise BGZFError("Incorrect length of decompressed blocks.")
         if decompressed_block == b"":
-            return  # bgzf ends with an empty block.
+            # EOF Block found, check if we are at the EOF or if there is
+            # another block.
+            if not file.peek(1):
+                return
         yield decompressed_block
