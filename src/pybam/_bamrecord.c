@@ -386,6 +386,15 @@ PyInit__bamrecord(void)
     if (m == NULL)
         return NULL;
 
+    if (PyType_Ready(&BamIterator_Type) < 0)
+        return NULL;
+    PyObject * BamiteratorType = (PyObject *)&BamIterator_Type;
+    Py_INCREF(BamiteratorType);
+    if (PyModule_AddObject(m, "BamIterator", BamiteratorType) < 0)
+        return NULL;
+
+    if (PyType_Ready(&BamRecord_Type) < 0)
+        return NULL;
     PyObject * BamRecordType = (PyObject *)&BamRecord_Type;
     Py_INCREF(BamRecordType);
     if (PyModule_AddObject(m, "BamRecord", BamRecordType) < 0) {
