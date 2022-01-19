@@ -253,49 +253,38 @@ BamIterator_iternext(BamIterator *self){
     self->pos += BAM_PROPERTIES_STRUCT_SIZE;
     bam_record->read_name = PyBytes_FromStringAndSize(
         self->buf + self->pos, bam_record->l_read_name -1);
-    if (bam_record->read_name == NULL) {
-        Py_DECREF(bam_record);
-        return PyErr_NoMemory();
-    }
     self->pos += bam_record->l_read_name;
 
     Py_ssize_t cigar_length = bam_record->n_cigar_op * sizeof(uint32_t);
     bam_record->cigar = PyBytes_FromStringAndSize(
         self->buf + self->pos, cigar_length);
-    if (bam_record->cigar == NULL) {
-        Py_DECREF(bam_record);
-        return PyErr_NoMemory();
-    }
     self->pos += cigar_length;
 
     Py_ssize_t seq_length = (bam_record->l_seq + 1) / 2;
     bam_record->seq = PyBytes_FromStringAndSize(
         self->buf + self->pos, seq_length);
-    if (bam_record->seq == NULL) {
-        Py_DECREF(bam_record);
-        return PyErr_NoMemory();
-    }
     self->pos += seq_length;
 
     bam_record->qual = PyBytes_FromStringAndSize(
         self->buf + self->pos, bam_record->l_seq);
-    if (bam_record->qual == NULL) {
-        Py_DECREF(bam_record);
-        return PyErr_NoMemory();
-    }
     self->pos += bam_record->l_seq;
 
     // Tags are in the remaining block of data.
     Py_ssize_t tags_length = start_pos + bam_record-> block_size - self->pos;
     bam_record->tags = PyBytes_FromStringAndSize(
         self->buf + self-> pos, tags_length);
-    if (bam_record->tags == NULL) {
+    
+    // Should be equal to start_pos + bam->record.block_size
+    self->pos += tags_length;
+
+    // Check if any of the bytes objects was NULL. This means there was 
+    // no memory available.
+    if (bam_record->read_name == NULL | bam_record->tags == NULL |
+        bam_record->seq == NULL | bam_record->qual == NULL |
+        bam_record->tags == NULL) {
         Py_DECREF(bam_record);
         return PyErr_NoMemory();
     }
-
-    // Should be equal to start_pos + bam->record.block_size
-    self->pos += tags_length;
 
     return (PyObject *)bam_record;
 }
