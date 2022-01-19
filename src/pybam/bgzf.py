@@ -20,9 +20,8 @@
 
 import io
 import struct
+import zlib
 from typing import Iterator
-
-from isal import isal_zlib
 
 GZIP_MAGIC = b"\x1f\x8b"
 GZIP_MAGIC_INT = int.from_bytes(GZIP_MAGIC, "little", signed=False)
@@ -64,10 +63,10 @@ def decompress_bgzf_blocks(file: io.BufferedReader) -> Iterator[bytes]:
             raise BGZFError(f"Truncated block. Block starts at {block_pos}")
         # Decompress block, use the isize as initial buffer size to avoid
         # resizing of the buffer.
-        decompressed_block = isal_zlib.decompress(block,
-                                                  wbits=-isal_zlib.MAX_WBITS,
+        decompressed_block = zlib.decompress(block,
+                                                  wbits=-zlib.MAX_WBITS,
                                                   bufsize=isize)
-        if crc != isal_zlib.crc32(decompressed_block):
+        if crc != zlib.crc32(decompressed_block):
             raise BGZFError("Checksum fail of decompressed block")
         if isize != len(decompressed_block):
             raise BGZFError("Incorrect length of decompressed blocks.")
