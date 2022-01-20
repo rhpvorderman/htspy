@@ -30,7 +30,6 @@ class BamRecord:
     cigar: bytes
     seq: bytes
     qual: bytes
-    tags: bytes
 
     @property
     def read_name(self) -> bytes: ...

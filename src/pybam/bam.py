@@ -24,6 +24,7 @@ from typing import Iterator
 from .bgzf import BGZFReader
 from ._bamrecord import BamRecord, bam_iterator
 
+
 class BAMFormatError(Exception):
     pass
 
@@ -52,7 +53,7 @@ class BamReader:
             name_length, = struct.unpack("<I", self._file.read(4))
             self._file.read(name_length + 4)  # Discard name and size
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[BamRecord]:
         yield from bam_iterator(self._file.read_until_next_block())
         for block in iter(self._file):
             yield from bam_iterator(block)
