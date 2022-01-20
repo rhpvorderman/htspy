@@ -114,13 +114,24 @@ class BGZFReader:
             self._buffer_size = len(block)
             current_pos = 0
 
-        while size > self._buffer_size:
+        while size > (self._buffer_size - current_pos):
             try:
                 block = next(self._block_iter)
-                self._buffer.seek(self._buffer_size)
-                self._buffer.write(block)
-                self._buffer_size += len(block)
             except StopIteration:
                 break
+            self._buffer.seek(self._buffer_size)
+            self._buffer.write(block)
+            self._buffer_size += len(block)
         self._buffer.seek(current_pos)
         return self._buffer.read(size)
+
+    def read_until_next_block(self) -> bytes:
+        """Read the BGZF file until the next BGZF block boundary."""
+        if self._buffer.tell() == self._buffer_size:
+            # Already at a block boundary, return next block
+            try:
+                return next(self._block_iter)
+            except StopIteration:
+                return b""
+        # Otherwise, read the rest of the block in the buffer.
+        return self._buffer.read()
