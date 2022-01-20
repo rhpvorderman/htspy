@@ -85,12 +85,18 @@ class BGZFReader:
         self._buffer = io.BytesIO()
         self._buffer_size = 0
 
+    def close(self):
+        self._buffer.close()
+        self._file.close()
+
     def __enter__(self):
         return self
 
-    def __exit__(self):
-        self._buffer.close()
-        self._file.close()
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+    def __iter__(self):
+        return self._block_iter
 
     def readall(self) -> bytes:
         current_pos = self._buffer.tell()
