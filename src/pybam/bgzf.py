@@ -76,3 +76,51 @@ def decompress_bgzf_blocks(file: io.BufferedReader) -> Iterator[bytes]:
             if not file.peek(1):
                 return
         yield decompressed_block
+
+
+class BGZFReader:
+    def __init__(self, filename: str):
+        self._file = open(filename, 'rb')
+        self._block_iter = decompress_bgzf_blocks(self._file)  # type: ignore
+        self._buffer = io.BytesIO()
+        self._buffer_size = 0
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self):
+        self._buffer.close()
+        self._file.close()
+
+    def readall(self) -> bytes:
+        current_pos = self._buffer.tell()
+        self._buffer.seek(self._buffer_size) # move to end of buffer
+        for block in self._block_iter:
+            self._buffer.write(block)
+        self._buffer.seek(current_pos)
+        return self._buffer.read()
+
+    def read(self, size=-1) -> bytes:
+        if size == -1:
+            return self.readall()
+        current_pos = self._buffer.tell()
+        if current_pos == self._buffer_size:
+            # End of current buffer reached, read new block
+            try:
+                block = next(self._block_iter)
+            except StopIteration:
+                return b""
+            self._buffer = io.BytesIO(block)
+            self._buffer_size = len(block)
+            current_pos = 0
+
+        while size > self._buffer_size:
+            try:
+                block = next(self._block_iter)
+                self._buffer.seek(self._buffer_size)
+                self._buffer.write(block)
+                self._buffer_size += len(block)
+            except StopIteration:
+                break
+        self._buffer.seek(current_pos)
+        return self._buffer.read(size)

@@ -20,6 +20,7 @@
 
 from typing import Iterator
 
+
 class BAMFormatError(Exception):
     pass
 
@@ -27,4 +28,4 @@ class BAMFormatError(Exception):
 def read_bam_header(bgzf_reader: Iterator[bytes]):
     block = next(bgzf_reader)
     if not block.startswith(b"BAM\1"):
-        raise
+        pass
