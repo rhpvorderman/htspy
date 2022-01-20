@@ -18,6 +18,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+from typing import Iterator
+
 class BamRecord:
     pos: int
     mapq: int
@@ -35,3 +37,6 @@ class BamRecord:
 
     @property
     def tags(self) -> bytes: ...
+
+
+def bam_iterator(data) -> Iterator[BamRecord]: ...
