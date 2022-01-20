@@ -48,7 +48,6 @@ static PyMemberDef BamRecord_members[] = {
     {"cigar", T_OBJECT_EX, offsetof(BamRecord, cigar), READONLY},
     {"seq", T_OBJECT_EX, offsetof(BamRecord, seq), READONLY},
     {"qual", T_OBJECT_EX, offsetof(BamRecord, qual), READONLY},
-    {"tags", T_OBJECT_EX, offsetof(BamRecord, tags), 0},
     {NULL}
 };
 
