@@ -245,7 +245,9 @@ BamIterator_iternext(BamIterator *self){
             self->buf + self->pos,
             BAM_PROPERTIES_STRUCT_SIZE);
 
-    if (self->pos + bam_record->block_size > self->len) {
+    // Block_size is excluding the block_size field it self.
+    Py_ssize_t record_length = bam_record->block_size + 4;
+    if (self->pos + record_length > self->len) {
         PyErr_SetString(PyExc_EOFError, "Truncated BAM record");
         Py_DECREF(bam_record);
         return NULL;
@@ -270,11 +272,11 @@ BamIterator_iternext(BamIterator *self){
     self->pos += bam_record->l_seq;
 
     // Tags are in the remaining block of data.
-    Py_ssize_t tags_length = start_pos + bam_record-> block_size - self->pos;
+    Py_ssize_t tags_length = start_pos + record_length - self->pos;
     bam_record->tags = PyBytes_FromStringAndSize(
         self->buf + self-> pos, tags_length);
     
-    // Should be equal to start_pos + bam->record.block_size
+    // Should be equal to record_length
     self->pos += tags_length;
 
     // Check if any of the bytes objects was NULL. This means there was 
