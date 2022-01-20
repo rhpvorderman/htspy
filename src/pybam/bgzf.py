@@ -53,7 +53,7 @@ def decompress_bgzf_blocks(file: io.BufferedReader) -> Iterator[bytes]:
             raise BGZFError(f"Invalid BSIZE fields at {block_pos}")
         # Skip other xtra fields.
         file.read(xlen - 6)
-        block_size = bsize + 1
+        block_size = bsize - xlen - 19
         block = file.read(block_size)
         if len(block) < block_size:
             raise EOFError(f"Truncated block at: {block_pos}")
