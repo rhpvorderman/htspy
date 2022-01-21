@@ -23,6 +23,11 @@ import struct
 import zlib
 from typing import Iterator
 
+try:
+    from isal import isal_zlib
+except:
+    isal_zlib = None
+
 GZIP_MAGIC = b"\x1f\x8b"
 GZIP_MAGIC_INT = int.from_bytes(GZIP_MAGIC, "little", signed=False)
 
@@ -32,6 +37,12 @@ class BGZFError(IOError):
 
 
 def decompress_bgzf_blocks(file: io.BufferedReader) -> Iterator[bytes]:
+    if isal_zlib:
+        decompress = isal_zlib.decompress
+        crc32 = isal_zlib.crc32
+    else:
+        decompress = dezlib.compress
+        crc32 = zlib.crc32
     while True:
         block_pos = file.tell()
         header = file.read(18)
@@ -63,10 +74,9 @@ def decompress_bgzf_blocks(file: io.BufferedReader) -> Iterator[bytes]:
         crc, isize = struct.unpack("<II", trailer)
         # Decompress block, use the isize as initial buffer size to avoid
         # resizing of the buffer.
-        decompressed_block = zlib.decompress(block,
-                                             wbits=-zlib.MAX_WBITS,
-                                             bufsize=isize)
-        if crc != zlib.crc32(decompressed_block):
+        decompressed_block = decompress(block,
+                                        wbits=-isal_zlib.MAX_WBITS)
+        if crc != crc32(decompressed_block):
             raise BGZFError("Checksum fail of decompressed block")
         if isize != len(decompressed_block):
             raise BGZFError("Incorrect length of decompressed blocks.")
