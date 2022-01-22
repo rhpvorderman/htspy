@@ -50,6 +50,12 @@ setup(
         "License :: OSI Approved :: MIT License",
     ],
     python_requires=">=3.6",
+    extras_require = {
+        ':platform.machine == "x86_64" and '
+        'python_implementation != "PyPy"': ['isal>=0.9.0'],
+        ':platform.machine == "AMD64" and '
+        'python_implementation != "PyPy"': ['isal>=0.9.0'],
+    },
     ext_modules=[
         Extension("pybam._bamrecord", ["src/pybam/_bamrecord.c"])
     ],
