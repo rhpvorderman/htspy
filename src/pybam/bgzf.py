@@ -25,7 +25,7 @@ from typing import Iterator
 
 try:
     from isal import isal_zlib
-except:
+except ImportError:
     isal_zlib = None
 
 GZIP_MAGIC = b"\x1f\x8b"
@@ -41,7 +41,7 @@ def decompress_bgzf_blocks(file: io.BufferedReader) -> Iterator[bytes]:
         decompress = isal_zlib.decompress
         crc32 = isal_zlib.crc32
     else:
-        decompress = dezlib.compress
+        decompress = zlib.decompress
         crc32 = zlib.crc32
     while True:
         block_pos = file.tell()
@@ -75,7 +75,7 @@ def decompress_bgzf_blocks(file: io.BufferedReader) -> Iterator[bytes]:
         # Decompress block, use the isize as initial buffer size to avoid
         # resizing of the buffer.
         decompressed_block = decompress(block,
-                                        wbits=-isal_zlib.MAX_WBITS)
+                                        wbits=-zlib.MAX_WBITS)
         if crc != crc32(decompressed_block):
             raise BGZFError("Checksum fail of decompressed block")
         if isize != len(decompressed_block):
