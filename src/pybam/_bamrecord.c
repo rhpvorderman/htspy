@@ -59,11 +59,11 @@ BamRecord_dealloc(BamRecord *self) {
 }
 
 static PyMemberDef BamRecord_members[] = {
+    {"refID", T_INT, offsetof(BamRecord, pos), READONLY},
     {"pos", T_INT, offsetof(BamRecord, pos), READONLY},
     {"mapq", T_UBYTE, offsetof(BamRecord, mapq), READONLY},
     {"flag", T_USHORT, offsetof(BamRecord, flag), READONLY},
     {"next_pos", T_INT, offsetof(BamRecord, next_pos), READONLY},
-    {"pnext", T_INT, offsetof(BamRecord, next_pos), READONLY}, // SAM name for next pos.
     {"tlen", T_INT, offsetof(BamRecord, tlen), READONLY},
     {"cigar", T_OBJECT_EX, offsetof(BamRecord, cigar), READONLY},
     {"seq", T_OBJECT_EX, offsetof(BamRecord, seq), READONLY},
