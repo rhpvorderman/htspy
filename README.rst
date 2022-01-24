@@ -22,8 +22,9 @@ created.
 
 Design principles
 =====================
-+ Reading the `samv1 specification <>`_ (the BAM format section) should be
-  a good introduction to this API.
++ Reading the `samv1 specification
+  <https://github.com/samtools/hts-specs/blob/master/SAMv1.pdf>`_
+  (the BAM format section) should be a good introduction to this API.
 + The API must represent the underlying format as closely as possible. Example:
   BAM records do not store a reference name. Therefore BAM records may not
   have a ``reference_name`` attribute. (A method is acceptable).
@@ -55,5 +56,5 @@ The BGZF format is a format that follows the gzip specification. It can be
 handled in Python code entirely by using the ``struct`` and ``zlib`` modules
 to handle the headers/trailers and compression/decompression respectively.
 To speed up compression/decompression the `python bindings for ISA-L
-<https://github.com/pycompression/python-isal>_` were used.
+<https://github.com/pycompression/python-isal>`_ were used.
 
