@@ -61,7 +61,7 @@ BamRecord_dealloc(BamRecord *self) {
 static PyMemberDef BamRecord_members[] = {
     // All the underlying BAM struct members should be accessible read only.
     // This way we circumvent the dilemma BAM spec names vs Pythonic readable names.
-    // The BAM spec names are accessible READONLY by appending an underscore. This way
+    // The BAM spec names are accessible READONLY by prepending an underscore. This way
     // we communicate to the user that they are internal and readonly while still providing 
     // full access for power users.
     {"_block_size", T_UINT, offsetof(BamRecord, block_size), READONLY},
