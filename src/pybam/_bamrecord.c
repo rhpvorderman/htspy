@@ -59,15 +59,39 @@ BamRecord_dealloc(BamRecord *self) {
 }
 
 static PyMemberDef BamRecord_members[] = {
-    {"reference_id", T_INT, offsetof(BamRecord, refID), READONLY, "refID: The index number referring to the reference."},
-    {"position", T_INT, offsetof(BamRecord, pos), READONLY, "pos: The leftmost position where the template alignment starts (0-based)."},
+    // All the underlying BAM struct members should be accessible read only.
+    // This way we circumvent the dilemma BAM spec names vs Pythonic readable names.
+    // The BAM spec names are accessible READONLY by appending an underscore. This way
+    // we communicate to the user that they are internal and readonly while still providing 
+    // full access for power users.
+    {"_block_size", T_UINT, offsetof(BamRecord, block_size), READONLY},
+    {"_refID", T_INT, offsetof(BamRecord, refID), READONLY},
+    {"_pos", T_INT, offsetof(BamRecord, pos), READONLY},
+    {"_l_read_name", T_UBYTE, offsetof(BamRecord, l_read_name), READONLY},
+    {"_mapq", T_UBYTE, offsetof(BamRecord, mapq), READONLY},
+    {"_bin", T_USHORT, offsetof(BamRecord, bin), READONLY},
+    {"_n_cigar_op", T_USHORT, offsetof(BamRecord, bin), READONLY},
+    {"_flag", T_USHORT, offsetof(BamRecord, flag), READONLY},
+    {"_l_seq", T_UINT, offsetof(BamRecord, l_seq), READONLY},
+    {"_next_refID", T_INT, offsetof(BamRecord, next_refID), READONLY},
+    {"_next_pos", T_INT, offsetof(BamRecord, next_pos), READONLY},
+    {"_tlen", T_INT, offsetof(BamRecord, tlen), READONLY},
+    {"_read_name", T_OBJECT_EX, offsetof(BamRecord, read_name), READONLY},
+    {"_cigar", T_OBJECT_EX, offsetof(BamRecord, cigar), READONLY},
+    {"_seq", T_OBJECT_EX, offsetof(BamRecord, seq), READONLY},
+    {"_qual", T_OBJECT_EX, offsetof(BamRecord, qual), READONLY},
+    {"_tags", T_OBJECT_EX, offsetof(BamRecord, tags), READONLY},
+    
+    // Pythonic naming for convenient access. Everything here should be READONLY. 
+    // Values that are not readonly should be set trough properties to ensure
+    // the internal consistency of the BamRecord. (Correct lengths etc.)
+    {"reference_id", T_INT, offsetof(BamRecord, refID), READONLY, "The index number referring to the reference."},
+    {"position", T_INT, offsetof(BamRecord, pos), READONLY, "The leftmost position where the template alignment starts (0-based)."},
     {"mapping_quality", T_UBYTE, offsetof(BamRecord, mapq), READONLY, "mapq: The quality of the mapping."},
     {"flag", T_USHORT, offsetof(BamRecord, flag), READONLY, "flag: Bitwise flags."},
     {"next_position", T_INT, offsetof(BamRecord, next_pos), READONLY, "next_pos: The leftmost position of the next segment."},
     {"template_length", T_INT, offsetof(BamRecord, tlen), READONLY},
-    {"cigar", T_OBJECT_EX, offsetof(BamRecord, cigar), READONLY},
-    {"seq", T_OBJECT_EX, offsetof(BamRecord, seq), READONLY},
-    {"qual", T_OBJECT_EX, offsetof(BamRecord, qual), READONLY},
+    {"qualities", T_OBJECT_EX, offsetof(BamRecord, qual), READONLY},
     {NULL}
 };
 
