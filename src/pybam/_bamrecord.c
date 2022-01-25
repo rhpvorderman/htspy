@@ -63,7 +63,7 @@ static PyMemberDef BamRecord_members[] = {
     {"position", T_INT, offsetof(BamRecord, pos), READONLY, "pos: The leftmost position where the template alignment starts (0-based)."},
     {"mapping_quality", T_UBYTE, offsetof(BamRecord, mapq), READONLY, "mapq: The quality of the mapping."},
     {"flag", T_USHORT, offsetof(BamRecord, flag), READONLY, "flag: Bitwise flags."},
-    {"next_position", T_INT, offsetof(BamRecord, next_pos), READONLY¸ "next_pos: The leftmost position of the next segment."},
+    {"next_position", T_INT, offsetof(BamRecord, next_pos), READONLY, "next_pos: The leftmost position of the next segment."},
     {"template_length", T_INT, offsetof(BamRecord, tlen), READONLY},
     {"cigar", T_OBJECT_EX, offsetof(BamRecord, cigar), READONLY},
     {"seq", T_OBJECT_EX, offsetof(BamRecord, seq), READONLY},
