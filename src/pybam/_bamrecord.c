@@ -23,8 +23,6 @@
 #include "structmember.h"         // PyMemberDef
 #include <stdint.h>
 
-# define BAM_PROPERTIES_STRUCT_SIZE 36  // The combined size of all integers in BamRecord
-
 typedef struct {
     PyObject_HEAD
     uint32_t block_size;
@@ -47,6 +45,8 @@ typedef struct {
 } BamRecord;
 
 # define BAM_PROPERTIES_STRUCT_START offsetof(BamRecord, block_size)
+# define BAM_PROPERTIES_STRUCT_END offsetof(BamRecord, read_name)
+# define BAM_PROPERTIES_STRUCT_SIZE BAM_PROPERTIES_STRUCT_END - BAM_PROPERTIES_STRUCT_START
 
 static void
 BamRecord_dealloc(BamRecord *self) {
