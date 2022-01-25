@@ -116,17 +116,17 @@ static inline Py_ssize_t BamRecord_size(BamRecord * self) {
 
 // PROPERTIES
 
-PyDoc_STRVAR(BamRecord_qname_doc,
+PyDoc_STRVAR(BamRecord_query_name_doc,
 "The name of the aligned read as a string.\n"
 "WARNING: this attribute is a property that converts 'read_name' \n"
-"To ASCII For faster access use the 'read_name' attribute which \n"
+"to ASCII For faster access use the 'read_name' attribute which \n"
 "is an ASCII-encoded bytes object.");
 
-static PyObject * BamRecord_get_qname(BamRecord * self, void* closure) {
+static PyObject * BamRecord_get_query_name(BamRecord * self, void* closure) {
     return PyUnicode_FromEncodedObject(self->read_name, "ascii", "strict");
 }
 
-static int BamRecord_set_qname(BamRecord * self, PyObject * new_qname, void* closure) {
+static int BamRecord_set_query_name(BamRecord * self, PyObject * new_qname, void* closure) {
     PyObject * new_read_name = PyUnicode_AsASCIIString(new_qname);
     if (new_read_name == NULL)
         return -1;
@@ -201,8 +201,8 @@ static int BamRecord_set_tags(BamRecord * self, PyObject * new_tags, void* closu
 }
 
 static PyGetSetDef BamRecord_properties[] = {
-    {"qname", (getter)BamRecord_get_qname, (setter)BamRecord_set_qname, 
-     BamRecord_qname_doc, NULL},
+    {"query_name", (getter)BamRecord_get_query_name, (setter)BamRecord_set_query_name, 
+     BamRecord_query_name_doc, NULL},
     {"read_name", (getter)BamRecord_get_read_name, (setter)BamRecord_set_read_name,
      BamRecord_read_name_doc, NULL},
     {"tags", (getter)BamRecord_get_tags, (setter)BamRecord_set_tags,
