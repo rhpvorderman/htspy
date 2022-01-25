@@ -33,11 +33,10 @@ Design principles
 + Do not use Python's properties to disguise from the user when intensive
   calculation is taking place. Example: ``cigar`` is an array of 32-bit
   integers each of which encodes for an operation and a number. A conversion to
-  tuples or string requires quite some examples. Therefore ``cigar_as_string``
+  tuples or string requires quite some calculations. Therefore ``cigar_as_string``
   or ``cigar_as_tuples`` must be methods. ``mate_unmapped`` on the other hand
   may be a property attribute as it translates directly to a bit set in the
-  BAM record. Even though it takes a (simple) calculation to present that bit
-  as a Python boolean.
+  BAM record. It does not require calculation (merely a check if the bit is set).
 + Keep the API small. Having a gazillion methods on objects does not help
   with ease of programming.
 
