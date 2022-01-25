@@ -72,10 +72,13 @@ def decompress_bgzf_blocks(file: io.BufferedReader) -> Iterator[bytes]:
         if len(trailer) < 8:
             raise EOFError(f"Truncated block at: {block_pos}")
         crc, isize = struct.unpack("<II", trailer)
-        # Decompress block, use the isize as initial buffer size to avoid
-        # resizing of the buffer.
+        # Decompress block, use the 64K as initial buffer size to avoid
+        # resizing of the buffer. (Max block size before compressing is
+        # slightly less than 64K for BGZF blocks). 64K is allocated faster
+        # than sizes that are not powers of 2.
         decompressed_block = decompress(block,
-                                        wbits=-zlib.MAX_WBITS)
+                                        wbits=-zlib.MAX_WBITS,
+                                        bufsize=65536)
         if crc != crc32(decompressed_block):
             raise BGZFError("Checksum fail of decompressed block")
         if isize != len(decompressed_block):
