@@ -95,25 +95,6 @@ static PyMemberDef BamRecord_members[] = {
     {NULL}
 };
 
-
-static inline Py_ssize_t BamRecord_size(BamRecord * self) {
-    // self->l_read_name in the struct should be updated as users can assign 
-    // another object to self->read_name
-    Py_ssize_t tags_length = PyBytes_Size(self->tags);
-    if (tags_length == -1){
-        PyErr_SetString(PyExc_TypeError, "tags should be a bytes object.");
-        return -1;
-    }
-    // self->l_read_name is guaranteed to be correct by the getter and setter.
-    // The rest of the attributes are readonly so the sizes in the stuct are correct.
-    return BAM_PROPERTIES_STRUCT_SIZE +           // All struct integer sizes
-           self->l_read_name +                    // Length of read_name + 1 (NUL)
-           self->n_cigar_op * sizeof(uint32_t) +  // Length of cigar string
-           (self->l_seq + 1 / 2) +                // Length of encoded seq
-           (self->l_seq) +                        // Length of qualities
-           tags_length;                           // Length of tags
-}
-
 // PROPERTIES
 
 PyDoc_STRVAR(BamRecord_query_name_doc,
