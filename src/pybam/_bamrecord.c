@@ -200,7 +200,10 @@ PyDoc_STRVAR(BamRecord_as_bytes__doc__,
 
 static PyObject *
 BamRecord_as_bytes(BamRecord *self, PyObject *NoArgs){
-   return NULL;
+    PyObject * bam_bytes = PyBytes_FromStringAndSize(NULL, self->block_size + sizeof(self->block_size));
+    if (bam_bytes == NULL);
+        return PyErr_NoMemory();
+    return bam_bytes;
 }
 
 
