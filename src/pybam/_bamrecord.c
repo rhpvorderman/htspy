@@ -46,7 +46,7 @@ typedef struct {
 
 # define BAM_PROPERTIES_STRUCT_START offsetof(BamRecord, block_size)
 # define BAM_PROPERTIES_STRUCT_END offsetof(BamRecord, read_name)
-# define BAM_PROPERTIES_STRUCT_SIZE BAM_PROPERTIES_STRUCT_END - BAM_PROPERTIES_STRUCT_START
+# define BAM_PROPERTIES_STRUCT_SIZE (BAM_PROPERTIES_STRUCT_END - BAM_PROPERTIES_STRUCT_START)
 
 static void
 BamRecord_dealloc(BamRecord *self) {
