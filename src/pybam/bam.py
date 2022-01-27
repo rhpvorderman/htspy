@@ -32,6 +32,8 @@ class BAMFormatError(Exception):
 class BamReader:
     def __init__(self, filename: str):
         self._file = BGZFReader(filename)
+        self.header = b""
+        self.references = []
         self._read_header()
 
     def close(self):
@@ -47,11 +49,11 @@ class BamReader:
         if self._file.read(4) != b"BAM\1":
             raise BAMFormatError("Not a BAM file")
         header_size, = struct.unpack("<I", self._file.read(4))
-        self._file.read(header_size)  # Discard the header for now
+        self.header = self._file.read(header_size)
         number_of_references, = struct.unpack("<I", self._file.read(4))
         for i in range(number_of_references):
             name_length, = struct.unpack("<I", self._file.read(4))
-            self._file.read(name_length + 4)  # Discard name and size
+            self.references.append(self._file.read(name_length + 4))
 
     def __iter__(self) -> Iterator[BamRecord]:
         yield from bam_iterator(self._file.read_until_next_block())
