@@ -4,6 +4,8 @@ import sys
 
 if __name__ == "__main__":
     with BamReader(sys.argv[1]) as bam_reader:
-        for record in bam_reader:
-            pass
-
+        with BamWriter(sys.argv[2],
+                       bam_reader.header,
+                       bam_reader.references) as bam_writer:
+            for record in bam_reader:
+                bam_writer.write(record)

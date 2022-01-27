@@ -171,8 +171,7 @@ def _zlib_compress(data, level, wbits):
 class BGZFWriter:
     def __init__(self, filename: str, compresslevel: Optional[int] = None):
         self._file = open(filename, 'wb')
-        self._buffer = io.BytesIO(bytes(BGZF_MAX_BLOCK_SIZE))
-        self._buffer_view = self._buffer.getbuffer()
+        self._buffer = io.BytesIO(bytearray(BGZF_MAX_BLOCK_SIZE))
         self._buffer_size = 0
         self._buffer.seek(0)
         if isal_zlib:
@@ -195,7 +194,6 @@ class BGZFWriter:
         self.flush()
         self.flush()  # Second flush writes empty EOF block.
         self._buffer.close()
-        self._buffer_view.release()
         self._file.close()
 
     def __enter__(self):
@@ -205,7 +203,7 @@ class BGZFWriter:
         self.close()
 
     def flush(self):
-        data_view = self._buffer_view[:self._buffer_size]
+        data_view = self._buffer.getbuffer()[:self._buffer_size]
         compressed_block = self._compress(data_view, self.compresslevel,
                                           wbits=-zlib.MAX_WBITS)
         # Length of the compressed block + generic gzip header (10 bytes) +
