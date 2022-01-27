@@ -193,6 +193,7 @@ class BGZFWriter:
 
     def close(self):
         self.flush()
+        self.flush()  # Second flush writes empty EOF block.
         self._buffer.close()
         self._buffer_view.release()
         self._file.close()
