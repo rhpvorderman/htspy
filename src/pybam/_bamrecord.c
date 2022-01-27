@@ -196,14 +196,44 @@ PyDoc_STRVAR(BamRecord_as_bytes__doc__,
 "Return the BAM record as a bytesobject that can be written into a file.");
 
 #define BAMRECORD_AS_BYTES_METHODDEF    \
-    {"as_bytes", (PyCFunction)(void(*)(void))BamRecord_as_bytes, METH_NOARGS, BamRecord_as_bytes__doc__}
+    {"as_bytes", (PyCFunction)(void(*)(void))BamRecord_as_bytes, METH_NOARGS, \
+     BamRecord_as_bytes__doc__}
 
 static PyObject *
 BamRecord_as_bytes(BamRecord *self, PyObject *NoArgs){
-    PyObject * bam_bytes = PyBytes_FromStringAndSize(NULL, self->block_size + sizeof(self->block_size));
-    if (bam_bytes == NULL);
+    PyObject * ret_val = PyBytes_FromStringAndSize(
+        NULL, self->block_size + sizeof(self->block_size));
+    if (ret_val == NULL);
         return PyErr_NoMemory();
-    return bam_bytes;
+    char * bam_bytes = PyBytes_AS_STRING(ret_val);
+    
+    memcpy(bam_bytes, self + BAM_PROPERTIES_STRUCT_START, 
+         BAM_PROPERTIES_STRUCT_SIZE);
+    Py_ssize_t cursor = BAM_PROPERTIES_STRUCT_SIZE;
+    
+    Py_ssize_t read_name_size = PyBytes_GET_SIZE(self->read_name);
+    memcpy(bam_bytes + cursor, PyBytes_AS_STRING(self->read_name), read_name_size);
+    cursor += read_name_size;
+
+    // Terminate read_name with NULL byte
+    bam_bytes[cursor] = 0; cursor += 1;
+
+    Py_ssize_t cigar_size = PyBytes_GET_SIZE(self->cigar);
+    memcpy(bam_bytes + cursor, PyBytes_AS_STRING(self->cigar), cigar_size);
+    cursor += cigar_size;
+
+    Py_ssize_t seq_size = PyBytes_GET_SIZE(self->seq);
+    memcpy(bam_bytes + cursor, PyBytes_AS_STRING(self->seq), seq_size);
+    cursor += seq_size;
+
+    Py_ssize_t qual_size = PyBytes_GET_SIZE(self->qual);
+    memcpy(bam_bytes + cursor, PyBytes_AS_STRING(self->qual), qual_size);
+    cursor += qual_size;
+
+    Py_ssize_t tag_size = PyBytes_GET_SIZE(self->tags);
+    memcpy(bam_bytes + cursor, PyBytes_AS_STRING(self->tags), tag_size);
+
+    return ret_val;
 }
 
 
