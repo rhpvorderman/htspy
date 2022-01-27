@@ -21,7 +21,7 @@
 import io
 import struct
 import zlib
-from typing import Iterator
+from typing import Iterator, Optional
 
 try:
     from isal import isal_zlib
@@ -30,6 +30,12 @@ except ImportError:
 
 GZIP_MAGIC = b"\x1f\x8b"
 GZIP_MAGIC_INT = int.from_bytes(GZIP_MAGIC, "little", signed=False)
+
+BGZF_MAX_BLOCK_SIZE = 0x10000  # 64K, 65536. Same as bgzf.h
+BGZF_BLOCK_SIZE = 0xff00  # 65280. Same as bgzf.h
+
+# XFL not set
+BGZF_BASE_HEADER = b"\x1f\x8b\x08\x04\x00\x00\x00\x00\x00\xff\x06\x42\x43"
 
 
 class BGZFError(IOError):
@@ -154,3 +160,51 @@ class BGZFReader:
                 return b""
         # Otherwise, read the rest of the block in the buffer.
         return self._buffer.read()
+
+
+class BGZFWriter:
+    def __init__(self, filename: str, compresslevel: Optional[int] = None):
+        self._file = open(filename, 'wb')
+        self._buffer = io.BytesIO(bytes(BGZF_MAX_BLOCK_SIZE))
+        self._buffer_view = self._buffer.getbuffer()
+        self._buffer_size = 0
+        self._buffer.seek(self._buffer_size)
+        if isal_zlib:
+            compress = isal_zlib.compress
+            default_compresslevel = 1
+        else:
+            def compress(data, level, wbits):
+                compressobj = zlib.compressobj(level, wbits=wbits)
+                return compressobj.compress(data) + compressobj.flush()
+            default_compresslevel = 1
+        self._compress = compress
+        self.compresslevel = compresslevel or default_compresslevel
+
+    def close(self):
+        self.flush()
+        self._buffer.close()
+        self._file.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+    def flush(self):
+        current_data = self._buffer_view[:self._buffer_size]
+        compressed_block = self._compress(current_data, self.compresslevel,
+                                          wbits=-zlib.MAX_WBITS)
+        bgzf_block_size_bytes = struct.pack()
+        self._file.write(compressed_block)
+        self._buffer_size = 0
+        self._buffer.seek(self._buffer_size)
+
+    def write(self, data):
+        data_length = len(data)
+        new_size = self._buffer_size + data_length
+        if new_size > BGZF_BLOCK_SIZE:
+            self.flush()
+            new_size = data_length
+        self._buffer.write(data)
+        self._buffer_size = new_size
