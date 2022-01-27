@@ -46,7 +46,8 @@ typedef struct {
 
 # define BAM_PROPERTIES_STRUCT_START offsetof(BamRecord, block_size)
 # define BAM_PROPERTIES_STRUCT_END offsetof(BamRecord, read_name)
-# define BAM_PROPERTIES_STRUCT_SIZE (BAM_PROPERTIES_STRUCT_END - BAM_PROPERTIES_STRUCT_START)
+# define BAM_PROPERTIES_STRUCT_SIZE (BAM_PROPERTIES_STRUCT_END - \
+                                     BAM_PROPERTIES_STRUCT_START)
 
 static void
 BamRecord_dealloc(BamRecord *self) {
@@ -60,10 +61,10 @@ BamRecord_dealloc(BamRecord *self) {
 
 static PyMemberDef BamRecord_members[] = {
     // All the underlying BAM struct members should be accessible read only.
-    // This way we circumvent the dilemma BAM spec names vs Pythonic readable names.
-    // The BAM spec names are accessible READONLY by prepending an underscore. This way
-    // we communicate to the user that they are internal and readonly while still providing 
-    // full access for power users.
+    // The BAM spec names are accessible READONLY by prepending an underscore. 
+    // This way we communicate to the user that they are internal and readonly 
+    // while still providing full access for power users. We also circumvent 
+    // the dilemma BAM spec names vs Pythonic readable names.
     {"_block_size", T_UINT, offsetof(BamRecord, block_size), READONLY},
     {"_refID", T_INT, offsetof(BamRecord, refID), READONLY},
     {"_pos", T_INT, offsetof(BamRecord, pos), READONLY},
@@ -82,14 +83,20 @@ static PyMemberDef BamRecord_members[] = {
     {"_qual", T_OBJECT_EX, offsetof(BamRecord, qual), READONLY},
     {"_tags", T_OBJECT_EX, offsetof(BamRecord, tags), READONLY},
     
-    // Pythonic naming for convenient access. Everything here should be READONLY. 
-    // Values that are not readonly should be set trough properties to ensure
-    // the internal consistency of the BamRecord. (Correct lengths etc.)
-    {"reference_id", T_INT, offsetof(BamRecord, refID), READONLY, "The index number referring to the reference."},
-    {"position", T_INT, offsetof(BamRecord, pos), READONLY, "The leftmost position where the template alignment starts (0-based)."},
-    {"mapping_quality", T_UBYTE, offsetof(BamRecord, mapq), READONLY, "mapq: The quality of the mapping."},
-    {"flag", T_USHORT, offsetof(BamRecord, flag), READONLY, "flag: Bitwise flags."},
-    {"next_position", T_INT, offsetof(BamRecord, next_pos), READONLY, "next_pos: The leftmost position of the next segment."},
+    // Pythonic naming for convenient access. Everything here should be 
+    // READONLY. Values that are not readonly should be set trough properties 
+    // to ensure the internal consistency of the BamRecord. (Correct lengths 
+    // etc.)
+    {"reference_id", T_INT, offsetof(BamRecord, refID), READONLY, 
+     "The index number referring to the reference."},
+    {"position", T_INT, offsetof(BamRecord, pos), READONLY, 
+     "The leftmost position where the template alignment starts (0-based)."},
+    {"mapping_quality", T_UBYTE, offsetof(BamRecord, mapq), READONLY, 
+     "The quality of the mapping."},
+    {"flag", T_USHORT, offsetof(BamRecord, flag), READONLY, 
+     "Bitwise flags."},
+    {"next_position", T_INT, offsetof(BamRecord, next_pos), READONLY, 
+     "next_pos: The leftmost position of the next segment."},
     {"template_length", T_INT, offsetof(BamRecord, tlen), READONLY},
     {"qualities", T_OBJECT_EX, offsetof(BamRecord, qual), READONLY},
     {NULL}
@@ -103,11 +110,15 @@ PyDoc_STRVAR(BamRecord_query_name_doc,
 "to ASCII For faster access use the 'read_name' attribute which \n"
 "is an ASCII-encoded bytes object.");
 
-static PyObject * BamRecord_get_query_name(BamRecord * self, void* closure) {
+static PyObject * 
+BamRecord_get_query_name(BamRecord * self, void* closure) 
+{
     return PyUnicode_FromEncodedObject(self->read_name, "ascii", "strict");
 }
 
-static int BamRecord_set_query_name(BamRecord * self, PyObject * new_qname, void* closure) {
+static int 
+BamRecord_set_query_name(BamRecord * self, PyObject * new_qname, void* closure) 
+{
     PyObject * new_read_name = PyUnicode_AsASCIIString(new_qname);
     if (new_read_name == NULL)
         return -1;
@@ -130,12 +141,15 @@ static int BamRecord_set_query_name(BamRecord * self, PyObject * new_qname, void
 PyDoc_STRVAR(BamRecord_read_name_doc,
 "The name of the aligned read as an ASCII encoded bytes object.\n");
 
-static PyObject * BamRecord_get_read_name(BamRecord * self, void* closure) {
+static PyObject * 
+BamRecord_get_read_name(BamRecord * self, void* closure) {
     Py_INCREF(self->read_name);
     return self->read_name;
 }
 
-static int BamRecord_set_read_name(BamRecord * self, PyObject * new_read_name, void* closure) {
+static int 
+BamRecord_set_read_name(BamRecord * self, PyObject * new_read_name, void* closure) 
+{
     if (!PyBytes_CheckExact(new_read_name)){
         PyErr_SetString(PyExc_TypeError, "read_name must be a bytes object");
         return -1;
@@ -160,12 +174,16 @@ static int BamRecord_set_read_name(BamRecord * self, PyObject * new_read_name, v
 PyDoc_STRVAR(BamRecord_tags_doc,
 "The raw tags as a bytes object.");
 
-static PyObject * BamRecord_get_tags(BamRecord * self, void* closure) {
+static PyObject * 
+BamRecord_get_tags(BamRecord * self, void* closure) 
+{
     Py_INCREF(self->tags);
     return self->tags;
 }
 
-static int BamRecord_set_tags(BamRecord * self, PyObject * new_tags, void* closure) {
+static int 
+BamRecord_set_tags(BamRecord * self, PyObject * new_tags, void* closure) 
+{
     if (!PyBytes_CheckExact(new_tags)){
         PyErr_SetString(PyExc_TypeError, "tags must be a bytes object");
         return -1;
@@ -200,7 +218,8 @@ PyDoc_STRVAR(BamRecord_as_bytes__doc__,
      BamRecord_as_bytes__doc__}
 
 static PyObject *
-BamRecord_as_bytes(BamRecord *self, PyObject *NoArgs){
+BamRecord_as_bytes(BamRecord *self, PyObject *NoArgs)
+{
     PyObject * ret_val = PyBytes_FromStringAndSize(
         NULL, self->block_size + sizeof(self->block_size));
     if (ret_val == NULL);
