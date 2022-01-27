@@ -53,7 +53,9 @@ class BamReader:
         number_of_references, = struct.unpack("<I", self._file.read(4))
         for i in range(number_of_references):
             name_length, = struct.unpack("<I", self._file.read(4))
-            self.references.append(self._file.read(name_length + 4))
+            name = self._file.read(name_length)
+            seq_len = struct.unpack("<I", self._file.read(4))
+            self.references.append((name, seq_len))
 
     def __iter__(self) -> Iterator[BamRecord]:
         yield from bam_iterator(self._file.read_until_next_block())
@@ -66,3 +68,23 @@ class BamWriter:
         self._file = BGZFWriter(filename)
         self._write_header(header, references)
 
+    def close(self):
+        self._file.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+    def _write_header(self, header, references):
+        self._file.write(b"BAM\x01")
+        self._file.write(struct.pack("<I", len(header)))
+        self._file.write(header)
+        for name, seq_len in references:
+            self._file.write(struct.pack("<I", len(name)))
+            self._file.write(name)
+            self._file.write(struct.pack("<I", seq_len))
+
+    def write(self, bam_record: BamRecord):
+        self._file.write(bam_record.as_bytes())
