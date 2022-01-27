@@ -19,9 +19,9 @@
 # SOFTWARE.
 
 import struct
-from typing import Iterator
+from typing import Iterator, List
 
-from .bgzf import BGZFReader
+from .bgzf import BGZFReader, BGZFWriter
 from ._bamrecord import BamRecord, bam_iterator
 
 
@@ -59,3 +59,10 @@ class BamReader:
         yield from bam_iterator(self._file.read_until_next_block())
         for block in iter(self._file):
             yield from bam_iterator(block)
+
+
+class BamWriter:
+    def __init__(self, filename: str, header: bytes, references: List[bytes]):
+        self._file = BGZFWriter(filename)
+        self._write_header(header, references)
+
