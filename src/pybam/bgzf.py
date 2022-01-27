@@ -35,7 +35,7 @@ BGZF_MAX_BLOCK_SIZE = 0x10000  # 64K, 65536. Same as bgzf.h
 BGZF_BLOCK_SIZE = 0xff00  # 65280. Same as bgzf.h
 
 # XFL not set
-BGZF_BASE_HEADER = b"\x1f\x8b\x08\x04\x00\x00\x00\x00\x00\xff\x06\x42\x43"
+BGZF_BASE_HEADER = b"\x1f\x8b\x08\x04\x00\x00\x00\x00\x00\xff\x06\x00\x42\x43\x02\x00"  # noqa: E501
 
 
 class BGZFError(IOError):
@@ -162,27 +162,39 @@ class BGZFReader:
         return self._buffer.read()
 
 
+def _zlib_compress(data, level, wbits):
+    """zlib.compress but with a wbits parameter."""
+    compressobj = zlib.compressobj(level, wbits=wbits)
+    return compressobj.compress(data) + compressobj.flush()
+
+
 class BGZFWriter:
     def __init__(self, filename: str, compresslevel: Optional[int] = None):
         self._file = open(filename, 'wb')
         self._buffer = io.BytesIO(bytes(BGZF_MAX_BLOCK_SIZE))
         self._buffer_view = self._buffer.getbuffer()
         self._buffer_size = 0
-        self._buffer.seek(self._buffer_size)
+        self._buffer.seek(0)
         if isal_zlib:
-            compress = isal_zlib.compress
+            if compresslevel == 0:
+                # No compression deflate blocks not supported by ISA-L.
+                compress = _zlib_compress
+            else:
+                compress = isal_zlib.compress
+            crc32 = isal_zlib.crc32
             default_compresslevel = 1
         else:
-            def compress(data, level, wbits):
-                compressobj = zlib.compressobj(level, wbits=wbits)
-                return compressobj.compress(data) + compressobj.flush()
+            compress = _zlib_compress
+            crc32 = zlib.crc32
             default_compresslevel = 1
         self._compress = compress
+        self._crc32 = crc32
         self.compresslevel = compresslevel or default_compresslevel
 
     def close(self):
         self.flush()
         self._buffer.close()
+        self._buffer_view.release()
         self._file.close()
 
     def __enter__(self):
@@ -192,13 +204,21 @@ class BGZFWriter:
         self.close()
 
     def flush(self):
-        current_data = self._buffer_view[:self._buffer_size]
-        compressed_block = self._compress(current_data, self.compresslevel,
+        data_view = self._buffer_view[:self._buffer_size]
+        compressed_block = self._compress(data_view, self.compresslevel,
                                           wbits=-zlib.MAX_WBITS)
-        bgzf_block_size_bytes = struct.pack()
+        # Length of the compressed block + generic gzip header (10 bytes) +
+        # XLEN field (2 bytes)
+        bgzf_block_size_bytes = struct.pack("H", len(compressed_block) + 25)
+        trailer = struct.pack("<II",
+                              self._crc32(data_view),
+                              data_view.nbytes & 0xFFFFFFFF)
+        self._file.write(BGZF_BASE_HEADER)
+        self._file.write(bgzf_block_size_bytes)
         self._file.write(compressed_block)
+        self._file.write(trailer)
         self._buffer_size = 0
-        self._buffer.seek(self._buffer_size)
+        self._buffer.seek(0)
 
     def write(self, data):
         data_length = len(data)
