@@ -225,7 +225,7 @@ BamRecord_as_bytes(BamRecord *self, PyObject *NoArgs)
     }
     char * bam_bytes = PyBytes_AS_STRING(ret_val);
     
-    memcpy(bam_bytes, self + BAM_PROPERTIES_STRUCT_START, 
+    memcpy(bam_bytes, (char *)self + BAM_PROPERTIES_STRUCT_START,
          BAM_PROPERTIES_STRUCT_SIZE);
     Py_ssize_t cursor = BAM_PROPERTIES_STRUCT_SIZE;
     
