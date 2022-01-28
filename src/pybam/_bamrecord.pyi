@@ -21,15 +21,34 @@
 from typing import Iterator
 
 class BamRecord:
-    pos: int
-    mapq: int
+    _block_size: int
+    _refID: int
+    _pos: int
+    _l_read_name: int
+    _mapq: int
+    _bin: int
+    _n_cigar_op: int
+    _flag: int
+    _l_seq: int
+    _next_refID: int
+    _next_pos: int
+    _tlen: int
+    _read_name: bytes
+    _cigar: bytes
+    _seq: bytes
+    _qual: bytes
+    _tags: bytes
+
+    reference_id: int
+    position: int
+    mapping_quality: int
     flag: int
-    next_pos: int
-    pnext: int
-    tlen: int
-    cigar: bytes
-    seq: bytes
-    qual: bytes
+    next_position: int
+    template_length: int
+    qualities: bytes
+
+    @property
+    def query_name(self) -> bytes: ...
 
     @property
     def read_name(self) -> bytes: ...
