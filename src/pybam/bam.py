@@ -81,6 +81,7 @@ class BamWriter:
         self._file.write(b"BAM\x01")
         self._file.write(struct.pack("<I", len(header)))
         self._file.write(header)
+        self._file.write(struct.pack("<I", len(references)))
         for name, seq_len in references:
             self._file.write(struct.pack("<I", len(name)))
             self._file.write(name)
