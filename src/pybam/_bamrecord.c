@@ -222,8 +222,9 @@ BamRecord_as_bytes(BamRecord *self, PyObject *NoArgs)
 {
     PyObject * ret_val = PyBytes_FromStringAndSize(
         NULL, self->block_size + sizeof(self->block_size));
-    if (ret_val == NULL);
+    if (ret_val == NULL){
         return PyErr_NoMemory();
+    }
     char * bam_bytes = PyBytes_AS_STRING(ret_val);
     
     memcpy(bam_bytes, self + BAM_PROPERTIES_STRUCT_START, 

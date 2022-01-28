@@ -54,7 +54,7 @@ class BamReader:
         for i in range(number_of_references):
             name_length, = struct.unpack("<I", self._file.read(4))
             name = self._file.read(name_length)
-            seq_len = struct.unpack("<I", self._file.read(4))
+            seq_len, = struct.unpack("<I", self._file.read(4))
             self.references.append((name, seq_len))
 
     def __iter__(self) -> Iterator[BamRecord]:
