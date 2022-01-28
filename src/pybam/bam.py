@@ -19,6 +19,7 @@
 # SOFTWARE.
 
 import struct
+import typing
 from typing import Iterator, List
 
 from .bgzf import BGZFReader, BGZFWriter
@@ -27,6 +28,37 @@ from ._bamrecord import BamRecord, bam_iterator
 
 class BAMFormatError(Exception):
     pass
+
+
+class BamReference(typing.NamedTuple):
+    name: str
+    length: int
+
+    def to_bytes(self) -> bytes:
+        nlen = struct.pack("<I", len(self.name))
+        seq_len = struct.pack("<I", self.length)
+        return nlen + self.name.encode('ascii', 'strict') + seq_len
+
+
+class BamHeader:
+    def __init__(self, header: str, references=None):
+        self._dict = dict()
+        if references is None:
+            self.references = []
+        lines = header.splitlines(keepends=False)
+
+    @staticmethod
+    def parse_line(line):
+        line_dict = {}
+        tags: List[str] = line.split("\t")
+        record_type = tags.pop(0)
+        record_type = record_type.lstrip("@")
+        if len(record_type) != 2:
+            raise BAMFormatError(f"Invalid record type in header: {record_type}")
+        for tag in tags:
+            tag_name, tag_value = tag.split(":")
+            line_dict[tag_name] = tag_value
+        return record_type, line_dict
 
 
 class BamReader:
