@@ -223,6 +223,22 @@ class BGZFWriter:
         data_length = len(data)
         new_size = self._buffer_size + data_length
         if new_size > BGZF_BLOCK_SIZE:
+            data_buffer = io.BytesIO(data)
+            while data_buffer.tell() != data_length:
+                written = self._buffer.write(
+                    data_buffer.read(BGZF_BLOCK_SIZE - self._buffer_size))
+                self._buffer_size += written
+                if self._buffer_size == BGZF_BLOCK_SIZE:
+                    self.flush()
+        else:
+            self._buffer.write(data)
+            self._buffer_size = new_size
+        return data_length
+
+    def write_block(self, data):
+        data_length = len(data)
+        new_size = self._buffer_size + data_length
+        if new_size > BGZF_BLOCK_SIZE:
             self.flush()
             new_size = data_length
         self._buffer.write(data)

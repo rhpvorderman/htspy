@@ -86,6 +86,7 @@ class BamWriter:
             self._file.write(struct.pack("<I", len(name)))
             self._file.write(name)
             self._file.write(struct.pack("<I", seq_len))
+        self._file.flush()
 
     def write(self, bam_record: BamRecord):
-        self._file.write(bam_record.as_bytes())
+        self._file.write_block(bam_record.as_bytes())
