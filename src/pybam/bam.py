@@ -17,7 +17,7 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-
+import io
 import struct
 import typing
 from typing import Dict, Iterator, List, Tuple
@@ -47,10 +47,8 @@ class BamHeader:
         self.rg: List[Dict[str, str]] = []
         self.pg: List[Dict[str, str]] = []
         self.co: List[str] = []
-
-        if references is None:
-            self.references: List[BamReference] = []
-        else:
+        self.references: List[BamReference] = []
+        if references is not None:
             self.references = references[:]
         lines = header.splitlines(keepends=False)
         if lines[0].startswith("@HD\t"):
@@ -99,12 +97,39 @@ class BamHeader:
             raise BAMFormatError(
                 f"{tag} is a mandatory tag on an @{record_type} line.")
 
+    @staticmethod
+    def _tag_dict_to_line(tag_dict):
+        return "\t".join(f"{tag}:{value}" for tag, value in tag_dict.items())
+
+    def to_sam_header(self) -> str:
+        header_buffer = io.StringIO()
+        header_buffer.write("@HD\t" + self._tag_dict_to_line(self.hd) + '\n')
+        for tag_dict in self.sq:
+            header_buffer.write("@SQ\t" + self._tag_dict_to_line(tag_dict) + '\n')
+        for tag_dict in self.rg:
+            header_buffer.write("@RG\t" + self._tag_dict_to_line(tag_dict) + '\n')
+        for tag_dict in self.pg:
+            header_buffer.write("@PG\t" + self._tag_dict_to_line(tag_dict) + '\n')
+        for line in self.co:
+            header_buffer.write("@CO\t" + line + '\n')
+        return header_buffer.getvalue()
+
+    def to_bytes(self) -> bytes:
+        header_buffer = io.BytesIO()
+        header_buffer.write(b"BAM\x01")
+        sam_header = self.to_sam_header().encode('ascii')
+        header_buffer.write(struct.pack("<I", len(sam_header)))
+        header_buffer.write(sam_header)
+        header_buffer.write(struct.pack("<I", len(self.references)))
+        for reference in self.references:
+            header_buffer.write(reference.to_bytes())
+        return header_buffer.getvalue()
+
 
 class BamReader:
     def __init__(self, filename: str):
         self._file = BGZFReader(filename)
-        self.header = b""
-        self.references = []
+        self.header: BamHeader
         self._read_header()
 
     def close(self):
@@ -120,13 +145,15 @@ class BamReader:
         if self._file.read(4) != b"BAM\1":
             raise BAMFormatError("Not a BAM file")
         header_size, = struct.unpack("<I", self._file.read(4))
-        self.header = self._file.read(header_size)
+        sam_header = self._file.read(header_size)
         number_of_references, = struct.unpack("<I", self._file.read(4))
+        references = []
         for i in range(number_of_references):
             name_length, = struct.unpack("<I", self._file.read(4))
             name = self._file.read(name_length)
             seq_len, = struct.unpack("<I", self._file.read(4))
-            self.references.append((name, seq_len))
+            references.append(BamReference(name.decode('ascii'), seq_len))
+        self.header = BamHeader(sam_header.decode('ascii'), references)
 
     def __iter__(self) -> Iterator[BamRecord]:
         yield from bam_iterator(self._file.read_until_next_block())
@@ -135,9 +162,10 @@ class BamReader:
 
 
 class BamWriter:
-    def __init__(self, filename: str, header: bytes, references: List[bytes]):
+    def __init__(self, filename: str, header: BamHeader):
         self._file = BGZFWriter(filename)
-        self._write_header(header, references)
+        self.header = header
+        self._write_header()
 
     def close(self):
         self._file.close()
@@ -148,16 +176,8 @@ class BamWriter:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
-    def _write_header(self, header, references):
-        self._file.write(b"BAM\x01")
-        self._file.write(struct.pack("<I", len(header)))
-        self._file.write(header)
-        self._file.write(struct.pack("<I", len(references)))
-        for name, seq_len in references:
-            self._file.write(struct.pack("<I", len(name)))
-            self._file.write(name)
-            self._file.write(struct.pack("<I", seq_len))
-        self._file.flush()
+    def _write_header(self):
+        self._file.write(self.header.to_bytes())
 
     def write(self, bam_record: BamRecord):
         self._file.write_block(bam_record.as_bytes())
