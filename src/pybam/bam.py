@@ -103,7 +103,8 @@ class BamHeader:
 
     def to_sam_header(self) -> str:
         header_buffer = io.StringIO()
-        header_buffer.write("@HD\t" + self._tag_dict_to_line(self.hd) + '\n')
+        if self.hd:  # Only write header line if not empty.
+            header_buffer.write("@HD\t" + self._tag_dict_to_line(self.hd) + '\n')
         for tag_dict in self.sq:
             header_buffer.write("@SQ\t" + self._tag_dict_to_line(tag_dict) + '\n')
         for tag_dict in self.rg:
