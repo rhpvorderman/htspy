@@ -182,4 +182,4 @@ class BamWriter:
         self._file.write(self.header.to_bytes())
 
     def write(self, bam_record: BamRecord):
-        self._file.write_block(bam_record.as_bytes())
+        self._file.write_block(bam_record.to_bytes())
