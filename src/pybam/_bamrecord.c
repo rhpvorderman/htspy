@@ -208,15 +208,15 @@ static PyGetSetDef BamRecord_properties[] = {
 };
 
 // METHODS
-PyDoc_STRVAR(BamRecord_as_bytes__doc__,
+PyDoc_STRVAR(BamRecord_to_bytes__doc__,
 "Return the BAM record as a bytesobject that can be written into a file.");
 
-#define BAMRECORD_AS_BYTES_METHODDEF    \
-    {"as_bytes", (PyCFunction)(void(*)(void))BamRecord_as_bytes, METH_NOARGS, \
-     BamRecord_as_bytes__doc__}
+#define BAMRECORD_to_bytes_METHODDEF    \
+    {"to_bytes", (PyCFunction)(void(*)(void))BamRecord_to_bytes, METH_NOARGS, \
+     BamRecord_to_bytes__doc__}
 
 static PyObject *
-BamRecord_as_bytes(BamRecord *self, PyObject *NoArgs)
+BamRecord_to_bytes(BamRecord *self, PyObject *NoArgs)
 {
     PyObject * ret_val = PyBytes_FromStringAndSize(
         NULL, self->block_size + sizeof(self->block_size));
@@ -256,7 +256,7 @@ BamRecord_as_bytes(BamRecord *self, PyObject *NoArgs)
 
 
 static PyMethodDef BamRecord_methods[] = {
-    BAMRECORD_AS_BYTES_METHODDEF,
+    BAMRECORD_TO_BYTES_METHODDEF,
     {NULL}
 };
 
