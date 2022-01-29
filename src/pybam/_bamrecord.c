@@ -211,7 +211,7 @@ static PyGetSetDef BamRecord_properties[] = {
 PyDoc_STRVAR(BamRecord_to_bytes__doc__,
 "Return the BAM record as a bytesobject that can be written into a file.");
 
-#define BAMRECORD_to_bytes_METHODDEF    \
+#define BAMRECORD_TO_BYTES_METHODDEF    \
     {"to_bytes", (PyCFunction)(void(*)(void))BamRecord_to_bytes, METH_NOARGS, \
      BamRecord_to_bytes__doc__}
 
