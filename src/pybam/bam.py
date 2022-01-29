@@ -87,7 +87,8 @@ class BamHeader:
         record_type = tags.pop(0)
         record_type = record_type.lstrip("@")
         for tag in tags:
-            tag_name, tag_value = tag.split(":")
+            # Tag can contain multiple colons. Only split on the first one.
+            tag_name, tag_value = tag.split(":", maxsplit=1)
             tags_dict[tag_name] = tag_value
         return record_type, tags_dict
 
