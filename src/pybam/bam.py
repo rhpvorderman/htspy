@@ -20,7 +20,7 @@
 
 import struct
 import typing
-from typing import Iterator, List
+from typing import Dict, Iterator, List, Tuple
 
 from .bgzf import BGZFReader, BGZFWriter
 from ._bamrecord import BamRecord, bam_iterator
@@ -42,23 +42,62 @@ class BamReference(typing.NamedTuple):
 
 class BamHeader:
     def __init__(self, header: str, references=None):
-        self._dict = dict()
+        self.hd: Dict[str, str] = dict()
+        self.sq: List[Dict[str, str]] = []
+        self.rg: List[Dict[str, str]] = []
+        self.pg: List[Dict[str, str]] = []
+        self.co: List[str] = []
+
         if references is None:
-            self.references = []
+            self.references: List[BamReference] = []
+        else:
+            self.references = references[:]
         lines = header.splitlines(keepends=False)
+        if lines[0].startswith("@HD\t"):
+            _, self.hd = self.parse_tag_line(lines[0])
+            self._check_tag_present("HD", "VN", self.hd)
+            start_at = 1
+        else:
+            start_at = 0
+
+        for line in lines[start_at:]:
+            if line.startswith("@CO"):
+                self.co.append(line.split("\t", 1)[1])
+                continue
+            record_type, tags_dict = self.parse_tag_line(line)
+            if record_type == "SQ":
+                self._check_tag_present("SQ", "SN", tags_dict)
+                self._check_tag_present("SQ", "LN", tags_dict)
+                self.sq.append(tags_dict)
+            elif record_type == "RG":
+                self._check_tag_present("RG", "ID", tags_dict)
+                self.rg.append(tags_dict)
+            elif record_type == "PG":
+                self._check_tag_present("PG", "ID", tags_dict)
+                self.pg.append(tags_dict)
+            elif record_type == "HD":
+                raise BAMFormatError(
+                    "@HD must be the first line in the header")
+            else:
+                raise BAMFormatError(
+                    f"Invalid record type in header: {record_type}")
 
     @staticmethod
-    def parse_line(line):
-        line_dict = {}
+    def parse_tag_line(line) -> Tuple[str, Dict[str, str]]:
+        tags_dict = {}
         tags: List[str] = line.split("\t")
         record_type = tags.pop(0)
         record_type = record_type.lstrip("@")
-        if len(record_type) != 2:
-            raise BAMFormatError(f"Invalid record type in header: {record_type}")
         for tag in tags:
             tag_name, tag_value = tag.split(":")
-            line_dict[tag_name] = tag_value
-        return record_type, line_dict
+            tags_dict[tag_name] = tag_value
+        return record_type, tags_dict
+
+    @staticmethod
+    def _check_tag_present(record_type, tag, tags_dict: Dict[str, str]):
+        if tag not in tags_dict:
+            raise BAMFormatError(
+                f"{tag} is a mandatory tag on an @{record_type} line.")
 
 
 class BamReader:
