@@ -70,7 +70,8 @@ BAM_CHARD_CLIP: int
 BAM_CPAD: int 
 BAM_CEQUAL: int 
 BAM_CDIFF: int 
-BAM_CBACK: int 
+BAM_CBACK: int
+BAM_CIGAR_SHIFT: int
 
 BAM_FPAIRED: int 
 BAM_FPOPER_PAIR: int 

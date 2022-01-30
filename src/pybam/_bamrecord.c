@@ -450,6 +450,7 @@ PyInit__bamrecord(void)
     PyModule_AddIntMacro(m, BAM_CEQUAL);
     PyModule_AddIntMacro(m, BAM_CDIFF);
     PyModule_AddIntMacro(m, BAM_CBACK);
+    PyModule_AddIntMacro(m, BAM_CIGAR_SHIFT);
 
     PyModule_AddIntMacro(m, BAM_FPAIRED);
     PyModule_AddIntMacro(m, BAM_FPROPER_PAIR);
