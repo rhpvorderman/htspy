@@ -71,7 +71,7 @@ static PyMemberDef BamRecord_members[] = {
     {"_l_read_name", T_UBYTE, offsetof(BamRecord, l_read_name), READONLY},
     {"_mapq", T_UBYTE, offsetof(BamRecord, mapq), READONLY},
     {"_bin", T_USHORT, offsetof(BamRecord, bin), READONLY},
-    {"_n_cigar_op", T_USHORT, offsetof(BamRecord, bin), READONLY},
+    {"_n_cigar_op", T_USHORT, offsetof(BamRecord, n_cigar_op), READONLY},
     {"_flag", T_USHORT, offsetof(BamRecord, flag), READONLY},
     {"_l_seq", T_UINT, offsetof(BamRecord, l_seq), READONLY},
     {"_next_refID", T_INT, offsetof(BamRecord, next_refID), READONLY},

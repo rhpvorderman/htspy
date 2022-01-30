@@ -6,7 +6,7 @@ import pytest
 from pybam._bamrecord import *
 
 
-def test_bam_parsing() -> bytes:
+def test_bam_parsing():
     reference_id = 3
     pos = 10000
     next_reference_id = -1
@@ -31,8 +31,8 @@ def test_bam_parsing() -> bytes:
                              reference_id, pos, l_read_name, mapq, bin,
                              n_cigar_op, flag, l_seq, next_reference_id,
                              next_pos, tlen)
-    bam_record_without_block_size = (bam_struct + read_name + cigar.tobytes() +
-                                     quals + tags)
+    bam_record_without_block_size = (bam_struct + read_name + b"\x00" +
+                                     cigar.tobytes() + seq + quals + tags)
     block_size = len(bam_record_without_block_size)
     bam_record = struct.pack("<I", block_size) + bam_record_without_block_size
     parsed_record = next(bam_iterator(bam_record))
@@ -53,4 +53,3 @@ def test_bam_parsing() -> bytes:
     assert parsed_record._seq == seq
     assert parsed_record._qual == quals
     assert parsed_record._tags == tags
-
