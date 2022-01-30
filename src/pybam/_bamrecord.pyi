@@ -60,3 +60,26 @@ class BamRecord:
 
 
 def bam_iterator(data) -> Iterator[BamRecord]: ...
+
+BAM_CMATCH: int 
+BAM_CINS: int 
+BAM_CDEL: int 
+BAM_CREF_SKIP: int 
+BAM_CSOFT_CLIP: int 
+BAM_CHARD_CLIP: int 
+BAM_CPAD: int 
+BAM_CEQUAL: int 
+BAM_CDIFF: int 
+BAM_CBACK: int 
+
+BAM_FPAIRED: int 
+BAM_FPOPER_PAIR: int 
+BAM_FUNMAP: int 
+BAM_FREVERSE: int 
+BAM_FMREVERSE: int 
+BAM_FREAD1: int 
+BAM_FREAD2: int 
+BAM_FSECONDARY: int 
+BAM_FQCFAIL: int 
+BAM_FDUP: int 
+BAM_FSUPPLEMENTARY: int 

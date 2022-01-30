@@ -1,7 +1,6 @@
 import pytest
 
-from pybam.bam import bam_iterator
-
+from pybam._bamrecord import *
 
 def test_bam_parsing() -> bytes:
     reference_id = -1
