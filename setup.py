@@ -37,7 +37,7 @@ setup(
     zip_safe=False,
     packages=find_packages('src'),
     package_dir={'': 'src'},
-    package_data={'pybam': ['*.pyi']},
+    package_data={'pybam': ['*.pyi', "htslib/*.h"]},
     url="https://github.com/rhpvorderman/pybam",
     classifiers=[
         "Programming Language :: Python :: 3 :: Only",
