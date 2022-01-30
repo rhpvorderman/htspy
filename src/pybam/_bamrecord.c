@@ -23,6 +23,8 @@
 #include "structmember.h"         // PyMemberDef
 #include <stdint.h>
 
+#include "htslib/sam.h"
+
 typedef struct {
     PyObject_HEAD
     uint32_t block_size;
@@ -437,5 +439,28 @@ PyInit__bamrecord(void)
     if (PyModule_AddObject(m, "BamRecord", BamRecordType) < 0) {
         return NULL;
     }
+
+    PyModule_AddIntMacro(m, BAM_CMATCH);
+    PyModule_AddIntMacro(m, BAM_CINS);
+    PyModule_AddIntMacro(m, BAM_CDEL);
+    PyModule_AddIntMacro(m, BAM_CREF_SKIP);
+    PyModule_AddIntMacro(m, BAM_CSOFT_CLIP);
+    PyModule_AddIntMacro(m, BAM_CHARD_CLIP);
+    PyModule_AddIntMacro(m, BAM_CPAD);
+    PyModule_AddIntMacro(m, BAM_CEQUAL);
+    PyModule_AddIntMacro(m, BAM_CDIFF);
+    PyModule_AddIntMacro(m, BAM_CBACK);
+
+    PyModule_AddIntMacro(m, BAM_FPAIRED);
+    PyModule_AddIntMacro(m, BAM_FPROPER_PAIR);
+    PyModule_AddIntMacro(m, BAM_FUNMAP);
+    PyModule_AddIntMacro(m, BAM_FREVERSE);
+    PyModule_AddIntMacro(m, BAM_FMREVERSE);
+    PyModule_AddIntMacro(m, BAM_FREAD1);
+    PyModule_AddIntMacro(m, BAM_FREAD2);
+    PyModule_AddIntMacro(m, BAM_FSECONDARY);
+    PyModule_AddIntMacro(m, BAM_FQCFAIL);
+    PyModule_AddIntMacro(m, BAM_FDUP);
+    PyModule_AddIntMacro(m, BAM_FSUPPLEMENTARY);
     return m;
 }
