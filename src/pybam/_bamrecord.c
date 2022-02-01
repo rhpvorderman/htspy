@@ -199,6 +199,61 @@ BamRecord_set_tags(BamRecord * self, PyObject * new_tags, void* closure)
     return 0;
 }
 
+// Flags 
+#define GET_FLAG_PROP(prop_name, FLAG) \
+static PyObject * \
+    prop_name(BamRecord *self, void *closure) {\
+    return PyBool_FromLong(self->flag & FLAG); \
+}
+
+PyDoc_STRVAR(BamRecord_is_paired_doc,
+"The read is paired in sequencing, no matter whether it is mapped in a pair");
+GET_FLAG_PROP(BamRecord_is_paired, BAM_FPAIRED)
+
+PyDoc_STRVAR(BamRecord_is_proper_pair_doc,
+"The read is mapped in a proper pair");
+GET_FLAG_PROP(BamRecord_is_proper_pair, BAM_FPROPER_PAIR)
+
+PyDoc_STRVAR(BamRecord_is_unmapped_doc,
+"The read itself is unmapped; conflictive with is_proper_pair.");
+GET_FLAG_PROP(BamRecord_is_unmapped, BAM_FUNMAP)
+
+PyDoc_STRVAR(BamRecord_mate_is_unmapped_doc,
+"The mate is unmapped");
+GET_FLAG_PROP(BamRecord_mate_is_unmapped, BAM_FMUNMAP)
+
+PyDoc_STRVAR(BamRecord_is_reverse_doc,
+"The read is mapped to the reverse strand");
+GET_FLAG_PROP(BamRecord_is_reverse, BAM_FREVERSE)
+
+PyDoc_STRVAR(BamRecord_mate_is_reverse_doc,
+"The mate is mapped to the reverse strand.");
+GET_FLAG_PROP(BamRecord_mate_is_reverse, BAM_FMREVERSE)
+
+PyDoc_STRVAR(BamRecord_is_read1_doc,
+"This is read1");
+GET_FLAG_PROP(BamRecord_is_read1, BAM_FREAD1)
+
+PyDoc_STRVAR(BamRecord_is_read2_doc,
+"This is read2");
+GET_FLAG_PROP(BamRecord_is_read2, BAM_FREAD2)
+
+PyDoc_STRVAR(BamRecord_is_secondary_doc,
+"This is not the primary alignment");
+GET_FLAG_PROP(BamRecord_is_secondary, BAM_FSECONDARY)
+
+PyDoc_STRVAR(BamRecord_is_qcfail_doc,
+"QC failure for this read");
+GET_FLAG_PROP(BamRecord_is_qcfail, BAM_FQCFAIL)
+
+PyDoc_STRVAR(BamRecord_is_duplicate_doc,
+"Read is an optical or PCR duplicate");
+GET_FLAG_PROP(BamRecord_is_duplicate, BAM_FDUP)
+
+PyDoc_STRVAR(BamRecord_is_supplementary_doc,
+"This is a supplementary alignment");
+GET_FLAG_PROP(BamRecord_is_supplementary, BAM_FSUPPLEMENTARY)
+
 static PyGetSetDef BamRecord_properties[] = {
     {"query_name", (getter)BamRecord_get_query_name, (setter)BamRecord_set_query_name, 
      BamRecord_query_name_doc, NULL},
@@ -206,6 +261,12 @@ static PyGetSetDef BamRecord_properties[] = {
      BamRecord_read_name_doc, NULL},
     {"tags", (getter)BamRecord_get_tags, (setter)BamRecord_set_tags,
      BamRecord_tags_doc, NULL},
+    {"is_paired", (getter)BamRecord_is_paired, NULL, 
+     BamRecord_is_paired_doc, NULL},
+    {"is_proper_pair", (getter)BamRecord_is_proper_pair, NULL, 
+     BamRecord_is_proper_pair_doc, NULL},
+    {"is_unmapped", (getter)BamRecord_is_unmapped, NULL, 
+     BamRecord_is_unmapped_doc, NULL},
     {NULL}
 };
 
