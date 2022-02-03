@@ -59,6 +59,28 @@ BamRecord_dealloc(BamRecord *self) {
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
+static inline int
+get_new_reference_to_bytes(PyObject *obj, void *ptr)
+{
+    if (PyBytes_CheckExact(obj)) {
+        Py_INCREF(obj);
+        ptr = obj;
+        return 1;
+    }
+    else if (PyUnicode_CheckExact(obj) && PyUnicode_IS_COMPACT_ASCII(obj)) {
+        PyObject * tmp = PyUnicode_AsASCIIString(obj);
+        if (tmp == NULL) {
+            return 0;
+        }
+        ptr = tmp;
+        return 1;
+    }
+    PyErr_Format(PyErr_BadArgument, 
+                 "Expected a bytes or str object got: %s",
+                  obj->ob_type->tp_name);
+    return 0;
+}
+
 static int
 BamRecord_init(BamRecord *self, PyObject *args, PyObject *kwargs) {
     self->refID = -1;
