@@ -83,6 +83,21 @@ convert_to_new_bytes_reference(PyObject *obj, const char * param_name)
 
 static int
 BamRecord_init(BamRecord *self, PyObject *args, PyObject *kwargs) {
+    PyObject * read_name;
+    char *keywords[] = {
+        "reference_id", "position", "read_name", "mapping_quality", 
+        "flag", "next_reference_id, next_position"};
+    char *format = "|IIObHII:BamRecord.__init__";
+    int32_t reference_id = -1; 
+    int32_t position = -1;
+    PyObject * read_name;
+    uint8_t mapping_quality;
+    uint16_t flag;
+    int32_t next_reference_id;
+    int32_t next_position;
+    PyArg_ParseTupleAndKeywords(args, kwargs, format, keywords, 
+        &reference_id, &position, &read_name, &mapping_quality, &flag, 
+        &next_reference_id, &next_position);
     self->refID = -1;
     self->pos = -1;
     self->l_read_name = 1;
