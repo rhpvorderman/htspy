@@ -63,15 +63,14 @@ BamRecord_dealloc(BamRecord *self) {
 static inline PyObject *
 convert_to_new_bytes_reference(PyObject *obj, const char * param_name)
 {
+    if (obj == NULL) {
+        return PyBytes_FromStringAndSize("", 0);
+    }
     if (PyBytes_CheckExact(obj)) {
         Py_INCREF(obj);
         return obj;
     }
-    else if (obj == Py_None) {
-        return PyBytes_FromStringAndSize("", 0);
-        
-    }
-    else if (PyUnicode_CheckExact(obj)) {
+    if (PyUnicode_CheckExact(obj)) {
         return PyUnicode_AsASCIIString(obj);
     }
     PyErr_Format(PyExc_TypeError, 
@@ -83,33 +82,36 @@ convert_to_new_bytes_reference(PyObject *obj, const char * param_name)
 
 static int
 BamRecord_init(BamRecord *self, PyObject *args, PyObject *kwargs) {
-    PyObject * read_name;
-    char *keywords[] = {
+    char * keywords[] = {
         "reference_id", "position", "read_name", "mapping_quality", 
         "flag", "next_reference_id, next_position"};
     char *format = "|IIObHII:BamRecord.__init__";
     int32_t reference_id = -1; 
     int32_t position = -1;
-    PyObject * read_name;
-    uint8_t mapping_quality;
-    uint16_t flag;
-    int32_t next_reference_id;
-    int32_t next_position;
+    PyObject * read_name = NULL;
+    uint8_t mapping_quality = 255;
+    uint16_t flag = 0;
+    int32_t next_reference_id = -1;
+    int32_t next_position = -1;
     PyArg_ParseTupleAndKeywords(args, kwargs, format, keywords, 
         &reference_id, &position, &read_name, &mapping_quality, &flag, 
         &next_reference_id, &next_position);
-    self->refID = -1;
-    self->pos = -1;
-    self->l_read_name = 1;
-    self->mapq = 255;
+    read_name = convert_to_new_bytes_reference(read_name);
+    if (read_name == NULL) {
+            return -1;
+    }
+    self->refID = reference_id;
+    self->pos = position;
+    self->l_read_name = PyBytes_GET_SIZE(read_name) + 1;
+    self->mapq = mapping_quality;
     self->bin = 0;
     self->n_cigar_op = 0;
-    self->flag = BAM_FUNMAP | BAM_FMUNMAP;
+    self->flag = flag;
     self->l_seq = 0;
-    self->next_refID = -1;
-    self->next_pos = -1;
+    self->next_refID = next_reference_id;
+    self->next_pos = next_position;
     self->tlen = 0;
-    self->read_name = PyBytes_FromStringAndSize("", 0);
+    self->read_name = read_name;
     self->cigar = PyBytes_FromStringAndSize("", 0);
     self->seq = PyBytes_FromStringAndSize("", 0);
     self->qual = PyBytes_FromStringAndSize("", 0);
