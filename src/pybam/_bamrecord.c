@@ -59,6 +59,29 @@ BamRecord_dealloc(BamRecord *self) {
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
+static int
+BamRecord_init(BamRecord *self, PyObject *args, PyObject *kwargs) {
+    self->refID = -1;
+    self->pos = -1;
+    self->l_read_name = 1;
+    self->mapq = 255;
+    self->bin = 0;
+    self->n_cigar_op = 0;
+    self->flag = BAM_FUNMAP | BAM_FMUNMAP;
+    self->l_seq = 0;
+    self->next_refID = -1;
+    self->next_pos = -1;
+    self->tlen = 0;
+    self->read_name = PyBytes_FromStringAndSize("", 0);
+    self->cigar = PyBytes_FromStringAndSize("", 0);
+    self->seq = PyBytes_FromStringAndSize("", 0);
+    self->qual = PyBytes_FromStringAndSize("", 0);
+    self->tags = PyBytes_FromStringAndSize("", 0);
+    self->block_size = (32 + self->l_read_name + (self->l_seq / 2 + 1) + 
+                        self->l_seq + self->n_cigar_op * 4 + 
+                        PyBytes_GET_SIZE(self->tags));
+}
+
 static PyMemberDef BamRecord_members[] = {
     // All the underlying BAM struct members should be accessible read only.
     // The BAM spec names are accessible READONLY by prepending an underscore. 
