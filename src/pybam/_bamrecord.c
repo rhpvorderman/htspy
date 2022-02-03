@@ -84,8 +84,8 @@ static int
 BamRecord_init(BamRecord *self, PyObject *args, PyObject *kwargs) {
     char * keywords[] = {
         "reference_id", "position", "read_name", "mapping_quality", 
-        "flag", "next_reference_id, next_position"};
-    char *format = "|IIObHII:BamRecord.__init__";
+        "flag", "next_reference_id, next_position", NULL};
+    const char *format = "|IIObHII:BamRecord.__init__";
     int32_t reference_id = -1; 
     int32_t position = -1;
     PyObject * read_name = NULL;
@@ -93,10 +93,12 @@ BamRecord_init(BamRecord *self, PyObject *args, PyObject *kwargs) {
     uint16_t flag = 0;
     int32_t next_reference_id = -1;
     int32_t next_position = -1;
-    PyArg_ParseTupleAndKeywords(args, kwargs, format, keywords, 
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, format, keywords, 
         &reference_id, &position, &read_name, &mapping_quality, &flag, 
-        &next_reference_id, &next_position);
-    read_name = convert_to_new_bytes_reference(read_name);
+        &next_reference_id, &next_position)) {
+        return -1; 
+    }
+    read_name = convert_to_new_bytes_reference(read_name, "read_name");
     if (read_name == NULL) {
             return -1;
     }
@@ -116,9 +118,10 @@ BamRecord_init(BamRecord *self, PyObject *args, PyObject *kwargs) {
     self->seq = PyBytes_FromStringAndSize("", 0);
     self->qual = PyBytes_FromStringAndSize("", 0);
     self->tags = PyBytes_FromStringAndSize("", 0);
-    self->block_size = (32 + self->l_read_name + (self->l_seq / 2 + 1) + 
+    self->block_size = (32 + self->l_read_name + (self->l_seq + 1 / 2) + 
                         self->l_seq + self->n_cigar_op * 4 + 
                         PyBytes_GET_SIZE(self->tags));
+    return 0;
 }
 
 static PyMemberDef BamRecord_members[] = {
@@ -416,6 +419,8 @@ static PyTypeObject BamRecord_Type = {
     .tp_methods = BamRecord_methods,
     .tp_members = BamRecord_members,   
     .tp_getset = BamRecord_properties,
+    .tp_init = (initproc)BamRecord_init,
+    .tp_new = PyType_GenericNew,
 };
 
 typedef struct {
