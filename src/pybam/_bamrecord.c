@@ -59,26 +59,26 @@ BamRecord_dealloc(BamRecord *self) {
     Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
-static inline int
-get_new_reference_to_bytes(PyObject *obj, void *ptr)
+// Convert an ASCII string to a bytes object if necessary.
+static inline PyObject *
+convert_to_new_bytes_reference(PyObject *obj, const char * param_name)
 {
     if (PyBytes_CheckExact(obj)) {
         Py_INCREF(obj);
-        ptr = obj;
-        return 1;
+        return obj;
     }
-    else if (PyUnicode_CheckExact(obj) && PyUnicode_IS_COMPACT_ASCII(obj)) {
-        PyObject * tmp = PyUnicode_AsASCIIString(obj);
-        if (tmp == NULL) {
-            return 0;
-        }
-        ptr = tmp;
-        return 1;
+    else if (obj == Py_None) {
+        return PyBytes_FromStringAndSize("", 0);
+        
     }
-    PyErr_Format(PyErr_BadArgument, 
-                 "Expected a bytes or str object got: %s",
+    else if (PyUnicode_CheckExact(obj)) {
+        return PyUnicode_AsASCIIString(obj);
+    }
+    PyErr_Format(PyExc_TypeError, 
+                 "'%s' expected a bytes or str object got: %s",
+                  param_name,
                   obj->ob_type->tp_name);
-    return 0;
+    return NULL;
 }
 
 static int
