@@ -464,7 +464,7 @@ BamIterator_iternext(BamIterator *self){
         return NULL;
     }
     // Copy the bam file data directly into the struct.
-    memcpy((void *)bam_record + BAM_PROPERTIES_STRUCT_START, 
+    memcpy((char *)bam_record + BAM_PROPERTIES_STRUCT_START,
             self->buf + self->pos,
             BAM_PROPERTIES_STRUCT_SIZE);
 
