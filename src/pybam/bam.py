@@ -22,8 +22,8 @@ import struct
 import typing
 from typing import Dict, Iterator, List, Tuple
 
-from .bgzf import BGZFReader, BGZFWriter
 from ._bamrecord import BamRecord, bam_iterator
+from .bgzf import BGZFReader, BGZFWriter
 
 
 class BAMFormatError(Exception):

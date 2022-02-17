@@ -1,9 +1,8 @@
 import array
 import struct
 
-import pytest
-
-from pybam._bamrecord import *
+from pybam._bamrecord import BAM_CDIFF, BAM_CIGAR_SHIFT, BAM_CMATCH, \
+    BAM_FUNMAP, bam_iterator
 
 
 def test_bam_parsing():

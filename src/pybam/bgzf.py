@@ -26,7 +26,7 @@ from typing import Iterator, Optional
 try:
     from isal import isal_zlib
 except ImportError:
-    isal_zlib = None
+    isal_zlib = None  # type: ignore
 
 GZIP_MAGIC = b"\x1f\x8b"
 GZIP_MAGIC_INT = int.from_bytes(GZIP_MAGIC, "little", signed=False)
@@ -47,8 +47,8 @@ def decompress_bgzf_blocks(file: io.BufferedReader) -> Iterator[bytes]:
         decompress = isal_zlib.decompress
         crc32 = isal_zlib.crc32
     else:
-        decompress = zlib.decompress
-        crc32 = zlib.crc32
+        decompress = zlib.decompress  # type: ignore
+        crc32 = zlib.crc32  # type: ignore
     while True:
         block_pos = file.tell()
         header = file.read(18)
@@ -119,7 +119,7 @@ class BGZFReader:
 
     def readall(self) -> bytes:
         current_pos = self._buffer.tell()
-        self._buffer.seek(self._buffer_size) # move to end of buffer
+        self._buffer.seek(self._buffer_size)  # move to end of buffer
         for block in self._block_iter:
             self._buffer.write(block)
         self._buffer.seek(current_pos)
@@ -184,7 +184,7 @@ class BGZFWriter:
             default_compresslevel = 1
         else:
             compress = _zlib_compress
-            crc32 = zlib.crc32
+            crc32 = zlib.crc32  # type: ignore
             default_compresslevel = 1
         self._compress = compress
         self._crc32 = crc32
