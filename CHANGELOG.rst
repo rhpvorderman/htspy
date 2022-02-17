@@ -9,3 +9,5 @@ Changelog
 
 0.1.0-dev
 --------------------
++ Implemented BAM writing capability.
++ Implemented basic BAM reading capability.
