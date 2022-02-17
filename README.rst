@@ -12,8 +12,7 @@ Due to pysam's long legacy, it is not possible to retroactively redesign pysam
 without a massive break in backwards compatibility. Therefore pybam was
 created.
 
-+ Speed: pybam reads faster than pysam. (writing a work in progress as of this
-  moment.)
++ Speed: pybam reads and writes faster than pysam.
 + Architecture: pybam interacts with BAM files and records directly, pysam only
   interacts with BAM files and records trough htslib.
 + Interface: pybam strives to offer a limited API that clearly communicates the
