@@ -39,6 +39,8 @@ typedef struct {
     int32_t next_refID;
     int32_t next_pos;
     int32_t tlen;
+    // The compiler automatically inserts 4 padding bytes here to properly
+    // align the PyObject pointers in memory.
     PyObject * read_name;
     PyObject * cigar;
     PyObject * seq;
