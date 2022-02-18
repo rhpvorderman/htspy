@@ -1,23 +1,26 @@
-pybam
+htspy
 =====
 
 Fast pythonic BAM reading according to the `HTS format specifications
 <http://samtools.github.io/hts-specs/>`_.
 
-Differences with pysam
-======================
+Just like `htsjdk <https://github.com/samtools/htsjdk>`_ htspy does not provide
+bindings for htslib but natively implements the HTS specifications.
 
-This project was started to address some of pysam's less attractive features.
-Due to pysam's long legacy, it is not possible to retroactively redesign pysam
-without a massive break in backwards compatibility. Therefore pybam was
-created.
+Goals:
 
-+ Speed: pybam reads and writes faster than pysam.
-+ Architecture: pybam interacts with BAM files and records directly, pysam only
-  interacts with BAM files and records trough htslib.
-+ Interface: pybam strives to offer a limited API that clearly communicates the
-  limitations of the BAM format. Pysam has a very (very) extensive API with
-  tons of features.
++ Speed: due to implementing core features in C using the Python C-API htspy
+  should be faster than any other python library supporting htslib formats
+  (most notably `pysam <https://github.com/pysam-developers/pysam>`_).
++ Pythonic: features should be easy to use and feel intuitive for
+  experienced Python programmers.
++ Architecture: interact natively with HTS formats rather than trough another
+  library.
+
+Currently the focus is on BAM, SAM and BGZF files. For FASTQ files there is
+already an excellent library: `dnaio <https://www.github.com/marcelm/dnaio>`_.
+For VCF there is already another very fast library: `cyvcf2
+<https://https://github.com/brentp/cyvcf2>`_.
 
 Design principles
 =====================

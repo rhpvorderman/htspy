@@ -1,4 +1,4 @@
-from pybam.bam import BamReader, BamWriter
+from htspy.bam import BamReader, BamWriter
 import sys
 
 
