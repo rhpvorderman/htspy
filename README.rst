@@ -10,15 +10,16 @@ bindings for htslib but natively implements the HTS specifications.
 Goals:
 
 + Speed: due to implementing core features in C using the Python C-API htspy
-  should be faster than any other bindings.
+  should be faster than any other python library supporting htslib formats
+  (most notably `pysam <https://github.com/pysam-developers/pysam>`_).
 + Pythonic: features should be easy to use and feel intuitive for
   experienced Python programmers.
 + Architecture: interact natively with HTS formats rather than trough another
   library.
 
-Currently the focus is on BAM and SAM files. For FASTQ files there is already
-an excellent library: `dnaio <https://www.github.com/marcelm/dnaio>`_. For VCF
-there is already another very fast library: `cyvcf2
+Currently the focus is on BAM, SAM and BGZF files. For FASTQ files there is
+already an excellent library: `dnaio <https://www.github.com/marcelm/dnaio>`_.
+For VCF there is already another very fast library: `cyvcf2
 <https://https://github.com/brentp/cyvcf2>`_.
 
 Design principles
