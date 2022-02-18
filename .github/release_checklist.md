@@ -1,6 +1,6 @@
 Release checklist
 - [ ] Check outstanding issues on Github.
-- [ ] Check [latest documentation](https://pybam.readthedocs.io/en/latest/) looks fine.
+- [ ] Check [latest documentation](https://htspy.readthedocs.io/en/latest/) looks fine.
 - [ ] Create a release branch.
   - [ ] Set version to a stable number.
   - [ ] Change current development version in `CHANGELOG.rst` to stable version.
@@ -10,7 +10,7 @@ Release checklist
 from CHANGELOG.rst.
 - [ ] Push tag to remote. This triggers the wheel/sdist build on github CI.
 - [ ] merge `main` branch back into `develop`.
-- [ ] Add updated version number to develop. (`setup.py` and `src/pybam/__init__.py`)
+- [ ] Add updated version number to develop. (`setup.py` and `src/htspy/__init__.py`)
 - [ ] Build the new tag on readthedocs. Only build the last patch version of
 each minor version. So `1.1.1` and `1.2.0` but not `1.1.0`, `1.1.1` and `1.2.0`.
 - [ ] Create a new release on github.

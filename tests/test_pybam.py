@@ -1,7 +1,7 @@
 import array
 import struct
 
-from pybam._bamrecord import BAM_CDIFF, BAM_CIGAR_SHIFT, BAM_CMATCH, \
+from htspy._bamrecord import BAM_CDIFF, BAM_CIGAR_SHIFT, BAM_CMATCH, \
     BAM_FUNMAP, bam_iterator
 
 

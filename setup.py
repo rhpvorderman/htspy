@@ -25,7 +25,7 @@ from setuptools import Extension, find_packages, setup
 LONG_DESCRIPTION = Path("README.rst").read_text()
 
 setup(
-    name="pybam",
+    name="htspy",
     version="0.1.0-dev",
     description="A fast BAM parser.",
     author="Ruben Vorderman",
@@ -37,8 +37,8 @@ setup(
     zip_safe=False,
     packages=find_packages('src'),
     package_dir={'': 'src'},
-    package_data={'pybam': ['*.pyi', "htslib/*.h"]},
-    url="https://github.com/rhpvorderman/pybam",
+    package_data={'htspy': ['*.pyi', "htslib/*.h"]},
+    url="https://github.com/rhpvorderman/htspy",
     classifiers=[
         "Programming Language :: Python :: 3 :: Only",
         "Programming Language :: Python :: 3",
@@ -58,6 +58,6 @@ setup(
         'python_implementation != "PyPy"': ['isal>=0.9.0'],
     },
     ext_modules=[
-        Extension("pybam._bamrecord", ["src/pybam/_bamrecord.c"])
+        Extension("htspy._bamrecord", ["src/htspy/_bamrecord.c"])
     ],
 )

@@ -1,4 +1,4 @@
-from pybam.bam import BamReader
+from htspy.bam import BamReader
 import sys
 import cProfile
 
