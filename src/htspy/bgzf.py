@@ -71,16 +71,23 @@ def decompress_bgzf_blocks(file: io.BufferedReader) -> Iterator[bytes]:
         # Skip other xtra fields.
         file.read(xlen - 6)
         block_size = bsize - xlen - 19
-        block = file.read(block_size)
-        if len(block) < block_size:
-            raise EOFError(f"Truncated block at: {block_pos}")
-        # Decompress block, use the 64K as initial buffer size to avoid
-        # resizing of the buffer. (Max block size before compressing is
-        # slightly less than 64K for BGZF blocks). 64K is allocated faster
-        # than sizes that are not powers of 2.
-        decompressed_block = decompress(block,
-                                        wbits=-zlib.MAX_WBITS,
-                                        bufsize=65536)
+        block_peek = file.peek(1)
+        if block_peek[0] == 1:  # No compression.
+            length, inverse_length = struct.unpack("<HH", file.read(5)[1:])
+            if length != ~inverse_length & 0xFFFF or length != block_size -5:
+                raise BGZFError(f"Corrupted uncompressed block at {block_pos}")
+            decompressed_block = file.read(length)
+        else:
+            block = file.read(block_size)
+            if len(block) < block_size:
+                raise EOFError(f"Truncated block at: {block_pos}")
+            # Decompress block, use the 64K as initial buffer size to avoid
+            # resizing of the buffer. (Max block size before compressing is
+            # slightly less than 64K for BGZF blocks). 64K is allocated faster
+            # than sizes that are not powers of 2.
+            decompressed_block = decompress(block,
+                                            wbits=-zlib.MAX_WBITS,
+                                            bufsize=65536)
         trailer = file.read(8)
         if len(trailer) < 8:
             raise EOFError(f"Truncated block at: {block_pos}")
