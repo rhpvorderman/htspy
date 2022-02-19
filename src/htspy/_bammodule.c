@@ -413,7 +413,7 @@ PyDoc_STRVAR(BamRecord__doc__,
 
 static PyTypeObject BamRecord_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_name = "_bamrecord.BamRecord",
+    .tp_name = "_bam.BamRecord",
     .tp_basicsize = sizeof(BamRecord),
     .tp_dealloc = (destructor)BamRecord_dealloc,      
     .tp_flags = Py_TPFLAGS_DEFAULT,
@@ -518,7 +518,7 @@ BamIterator_iternext(BamIterator *self){
 
 static PyTypeObject BamIterator_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_name = "_bamrecord.BamIterator", 
+    .tp_name = "_bam.BamIterator", 
     .tp_basicsize = sizeof(BamIterator),
     .tp_dealloc =(destructor)BamIterator_dealloc,  
     .tp_flags = Py_TPFLAGS_DEFAULT,
@@ -549,27 +549,27 @@ bam_iterator(PyObject *module, PyObject * obj) {
     return (PyObject *)self;
 }
 
-static PyMethodDef _bamrecord_methods[] = {
+static PyMethodDef _bam_methods[] = {
     {"bam_iterator", (PyCFunction)(void(*)(void))bam_iterator,
      METH_O, bam_iterator_doc},
     {NULL}
 };
 
-static struct PyModuleDef _bamrecord_module = {
+static struct PyModuleDef _bam_module = {
     PyModuleDef_HEAD_INIT,
-    "_bamrecord",   /* name of module */
+    "_bam",   /* name of module */
     NULL, /* module documentation, may be NULL */
     -1,
-    _bamrecord_methods  /* module methods */
+    _bam_methods  /* module methods */
 };
 
 
 PyMODINIT_FUNC
-PyInit__bamrecord(void)
+PyInit__bam(void)
 {
     PyObject *m;
 
-    m = PyModule_Create(&_bamrecord_module);
+    m = PyModule_Create(&_bam_module);
     if (m == NULL)
         return NULL;
 

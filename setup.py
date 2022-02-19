@@ -58,6 +58,6 @@ setup(
         'python_implementation != "PyPy"': ['isal>=0.9.0'],
     },
     ext_modules=[
-        Extension("htspy._bamrecord", ["src/htspy/_bamrecord.c"])
+        Extension("htspy._bam", ["src/htspy/_bammodule.c"])
     ],
 )
