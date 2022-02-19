@@ -27,6 +27,24 @@
 
 typedef struct {
     PyObject_HEAD
+    PyObject * raw;
+    Py_ssize_t n_cigar_op;
+} BamCigar;
+
+static void 
+BamCigar_dealloc(BamCigar *self) {
+    Py_CLEAR(self->raw);
+}
+
+static PyTypeObject BamCigar_Type = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_name = "_pybam.BamCigar",
+    .tp_basicsize = sizeof(BamCigar),
+    .tp_dealloc = (destructor)BamCigar_dealloc
+};
+
+typedef struct {
+    PyObject_HEAD
     uint32_t block_size;
     int32_t refID; 
     int32_t pos; 
@@ -587,6 +605,13 @@ PyInit__bam(void)
     if (PyModule_AddObject(m, "BamRecord", BamRecordType) < 0) {
         return NULL;
     }
+
+    if (PyType_Ready(&BamCigar_Type) < 0)
+        return NULL;
+    PyObject * BamCigarType = (PyObject *)&BamCigar_Type;
+    Py_INCREF(BamCigarType);
+    if (PyModule_AddObject(m, "BamCigar", BamCigarType) < 0)
+        return NULL;
 
     PyModule_AddIntMacro(m, BAM_CMATCH);
     PyModule_AddIntMacro(m, BAM_CINS);
