@@ -49,8 +49,7 @@ CIGAR_NUMBER_LIST = [
 
 @pytest.fixture(scope="module")
 def bam_cigar():
-    return None
-    # return BamCigar(CIGAR_STRING)
+    return BamCigar(CIGAR_STRING)
 
 
 def test_bam_cigar_to_string(bam_cigar):
