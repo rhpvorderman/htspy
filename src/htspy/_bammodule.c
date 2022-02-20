@@ -51,7 +51,7 @@ BamCigar_dealloc(BamCigar *self) {
 }
 
 /**
- * @brief Creates a new BamCigar without checks. For internal calls
+ * @brief Creates a new BamCigar without checks. For internal calls only.
  * 
  * @param bytes a PyBytesObject (not checked)
  * @param n_cigar_op (number of cigar units. Not checked with length of Bytes object.)
@@ -64,6 +64,56 @@ BamCigar_FromBytesAndSize(PyObject * bytes, Py_ssize_t n_cigar_op) {
     cigar->raw = bytes;
     cigar->cigar = (uint32_t *)PyBytes_AS_STRING(bytes);
     cigar->n_cigar_op;
+    return (PyO)
+}
+
+static PyObject *
+BamCigar__init__(PyTypeObject * cls, PyObject * cigartuples) {
+    if (!PyList_CheckExact(cigartuples)) {
+        PyErr_Format(PyExc_TypeError, "Expected a list got %s.", 
+                     Py_TYPE(cigartuples)->tp_name);
+        return NULL;
+    }
+    Py_ssize_t n_cigar_op = PyList_GET_SIZE(cigartuples);
+    PyObject * raw = PyBytes_FromStringAndSize(NULL, n_cigar_op * sizeof(uint32_t));
+    Py_ssize_t i = 0;
+    PyObject * tup;
+    PyObject * operation; 
+    PyObject * count; 
+    Py_ssize_t operation_i;
+    Py_ssize_t count_i;
+    
+    while (i < n_cigar_op) {
+        tup = PyList_GET_ITEM(cigartuples, i);
+        if (!PyTuple_CheckExact(tup)) {
+            PyErr_Format(PyExc_TypeError, 
+                         "List should only consist of tuples got '%s' for "
+                         "item: %R", 
+                         Py_TYPE(tup)->tp_name, tup);            
+        }
+        if (PyTuple_GET_SIZE(tup) != 2) {
+            PyErr_Format(PyExc_ValueError, 
+                         "Tuples should consist of 2 items got '%ld' for "
+                         "item: %r", 
+                          PyTuple_GET_SIZE(tup), tup);    
+        }
+        operation = PyTuple_GET_ITEM(tup, 0);
+        count = PyTuple_GET_ITEM(tup, 1);
+        if (!PyLong_CheckExact(operation)) {
+              PyErr_Format(PyExc_TypeError, 
+                           "Operation should be of type int, got '%s' for "
+                           "cigartuple: %R", 
+                           Py_TYPE(operation)->tp_name, tup);        
+        }
+        if (!PyLong_CheckExact(count)) {
+              PyErr_Format(PyExc_TypeError, 
+                           "Count should be of type int, got '%s' for "
+                           "cigartuple: %R", 
+                           Py_TYPE(count)->tp_name, tup);        
+        }
+        operation_i = PyLong_AsSsize_t(operation);
+        count_i = PyLong_AsSsize_t(count);
+    }
 }
 
 static PyTypeObject BamCigar_Type = {
