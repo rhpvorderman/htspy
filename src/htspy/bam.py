@@ -42,7 +42,7 @@ from ._bam import (
 from .bgzf import BGZFReader, BGZFWriter
 
 
-class CigarOp(enum.Enum):
+class CigarOp(enum.IntEnum):
     MATCH = BAM_CMATCH
     INS = BAM_CINS
     INSERT = BAM_CINS
