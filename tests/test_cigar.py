@@ -46,60 +46,35 @@ CIGAR_NUMBER_LIST = [
     (268_435_435 << 4) | CigarOp.BACK,
 ]
 
+CIGAR_TUPLES = [
+    (CigarOp.MATCH, 1),
+    (CigarOp.INS, 20),
+    (CigarOp.DEL, 300),
+    (CigarOp.REF_SKIP, 4000),
+    (CigarOp.SOFT_CLIP, 50_0000),
+    (CigarOp.HARD_CLIP, 600_000),
+    (CigarOp.PAD, 7_000_000),
+    (CigarOp.EQUAL, 80_000_000),
+    (CigarOp.BACK, 268_435_435)
+]
 
 @pytest.fixture(scope="module")
 def bam_cigar():
-    return BamCigar(CIGAR_STRING)
+    return BamCigar(CIGAR_TUPLES)
 
 
 def test_bam_cigar_to_string(bam_cigar):
     assert bam_cigar.to_string() == CIGAR_STRING
 
+def test_bam_cigar_from_string():
+    assert BamCigar.from_string(CIGAR_STRING).to_tuples == CIGAR_TUPLES
 
 def test_bam_cigar__str__(bam_cigar):
     assert str(bam_cigar) == CIGAR_STRING
 
 
 def test_bam_cigar_to_tuples(bam_cigar):
-    assert bam_cigar.to_tuples() == [
-        (CigarOp.MATCH, 1),
-        (CigarOp.INS, 20),
-        (CigarOp.DEL, 300),
-        (CigarOp.REF_SKIP, 4000),
-        (CigarOp.SOFT_CLIP, 50_0000),
-        (CigarOp.HARD_CLIP, 600_000),
-        (CigarOp.PAD, 7_000_000),
-        (CigarOp.EQUAL, 80_000_000),
-        (CigarOp.BACK, 268_435_435)
-    ]
-
-
-def test_bam_cigar_get_item(bam_cigar):
-    assert bam_cigar[0] == CIGAR_NUMBER_LIST[0]
-    assert bam_cigar[1] == CIGAR_NUMBER_LIST[1]
-    assert bam_cigar[2] == CIGAR_NUMBER_LIST[2]
-    assert bam_cigar[3] == CIGAR_NUMBER_LIST[3]
-    assert bam_cigar[4] == CIGAR_NUMBER_LIST[4]
-    assert bam_cigar[5] == CIGAR_NUMBER_LIST[5]
-    assert bam_cigar[6] == CIGAR_NUMBER_LIST[6]
-    assert bam_cigar[7] == CIGAR_NUMBER_LIST[7]
-    assert bam_cigar[8] == CIGAR_NUMBER_LIST[8]
-    assert bam_cigar[-1] == bam_cigar[8]
-
-
-def test_bam_cigar_get_item_index_error(bam_cigar):
-    with pytest.raises(IndexError):
-        bam_cigar[9]
-
-
-def test_bam_cigar_get_slice(bam_cigar):
-    assert bam_cigar[0:1] == BamCigar("1M")
-    assert bam_cigar[0:9] == bam_cigar
-    assert bam_cigar[:3] == BamCigar("1M20I300D")
-
-
-def test_bam_cigar_len(bam_cigar):
-    assert len(bam_cigar) == 9
+    assert bam_cigar.to_tuples() ==
 
 
 def test_bam_cigar_buffer(bam_cigar):
