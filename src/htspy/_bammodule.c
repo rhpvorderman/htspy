@@ -24,6 +24,17 @@
 
 #include "_conversions.h"
 
+static PyObject * 
+encode_cigar_string(char * string, Py_ssize_t length) {
+    // A CIGAR string uses at least two characters per operation-length 
+    // combination. An encoded cigar uses one 32-bit integer per 
+    // operation-length combination. That is 4 bytes. So we need at most 
+    // (length / 2) * 4 == length * 2 unsigned integers.
+    PyObject * ret_val = PyBytes_FromStringAndSize(NULL, length * 2);
+    uint32_t * cigar = (uint32_t *)PyBytest_AS_STRING(ret_val);
+    char * tail_ptr;
+}
+
 typedef struct {
     PyObject_HEAD
     PyObject * raw;
