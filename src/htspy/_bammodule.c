@@ -28,12 +28,32 @@
 typedef struct {
     PyObject_HEAD
     PyObject * raw;
+    uint32_t * cigar;
     Py_ssize_t n_cigar_op;
+
 } BamCigar;
+
+static PyTypeObject BamCigar_Type;  // Forward declaration
 
 static void 
 BamCigar_dealloc(BamCigar *self) {
     Py_CLEAR(self->raw);
+}
+
+/**
+ * @brief Creates a new BamCigar without checks. For internal calls
+ * 
+ * @param bytes a PyBytesObject (not checked)
+ * @param n_cigar_op (number of cigar units. Not checked with length of Bytes object.)
+ * @return PyObject* 
+ */
+static PyObject *
+BamCigar_FromBytesAndSize(PyObject * bytes, Py_ssize_t n_cigar_op) {
+    BamCigar *cigar = PyObject_New(BamCigar, &BamCigar_Type);
+    Py_INCREF(bytes);
+    cigar->raw = bytes;
+    cigar->cigar = (uint32_t *)PyBytes_AS_STRING(bytes);
+    cigar->n_cigar_op;
 }
 
 static PyTypeObject BamCigar_Type = {
