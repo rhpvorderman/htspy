@@ -14,16 +14,17 @@ def character_to_bam_op_table():
 
 
 def main():
-    with open("src/pybam/conversions.h", "wt") as out:
+    with open("src/htspy/_conversions.h", "wt") as out:
+        out.write('#include "stdint.h"\n')
         out.write('#include "htslib/sam.h"\n')
         out.write('\n')
-        out.write('static const bam_cigar_table[256] = {')
+        out.write('static const char bam_cigar_table[256] = {\n    ')
         for i, literal in enumerate(character_to_bam_op_table()):
-            if i % 8 == 0:
-                out.write("\n    ")
-            out.write(literal.rjust(14, " ") + ", ")
-        out.write("\n")
-        out.write("}\n")
+            if i % 16 == 0 and i != 0:
+                out.write(f" // {(i // 16 - 1) * 16}-{i - 1}\n    ")
+            out.write(literal.rjust(2, " ") + ", ")
+        out.write(f" // {(i // 16 - 1) * 16}-{i - 1}\n")
+        out.write("};\n")
 
 
 if __name__ == "__main__":

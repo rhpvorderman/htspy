@@ -21,9 +21,8 @@
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include "structmember.h"         // PyMemberDef
-#include <stdint.h>
 
-#include "htslib/sam.h"
+#include "_conversions.h"
 
 typedef struct {
     PyObject_HEAD
