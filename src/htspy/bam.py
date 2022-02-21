@@ -164,8 +164,8 @@ class BamReader:
 
 
 class BamWriter:
-    def __init__(self, filename: str, header: BamHeader):
-        self._file = BGZFWriter(filename)
+    def __init__(self, filename: str, header: BamHeader, compresslevel = None):
+        self._file = BGZFWriter(filename, compresslevel)
         self.header = header
         self._write_header()
 
