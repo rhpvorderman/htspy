@@ -195,7 +195,8 @@ class BGZFWriter:
             default_compresslevel = 1
         self._compress = compress
         self._crc32 = crc32
-        self.compresslevel = compresslevel or default_compresslevel
+        self.compresslevel = (compresslevel if compresslevel is not None
+                              else default_compresslevel)
 
     def close(self):
         self.flush()
