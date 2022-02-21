@@ -182,17 +182,12 @@ class BGZFWriter:
         self._buffer_size = 0
         self._buffer.seek(0)
         if isal_zlib:
-            if compresslevel == 0:
-                # No compression deflate blocks not supported by ISA-L.
-                compress = _zlib_compress
-            else:
-                compress = isal_zlib.compress
+            compress = isal_zlib.compress
             crc32 = isal_zlib.crc32
-            default_compresslevel = 1
         else:
             compress = _zlib_compress
             crc32 = zlib.crc32  # type: ignore
-            default_compresslevel = 1
+        default_compresslevel = 1
         self._compress = compress
         self._crc32 = crc32
         self.compresslevel = (compresslevel if compresslevel is not None
@@ -212,17 +207,31 @@ class BGZFWriter:
 
     def flush(self):
         data_view = self._buffer.getbuffer()[:self._buffer_size]
-        compressed_block = self._compress(data_view, self.compresslevel,
-                                          wbits=-zlib.MAX_WBITS)
-        # Length of the compressed block + generic gzip header (10 bytes) +
-        # XLEN field (2 bytes)
-        bgzf_block_size_bytes = struct.pack("H", len(compressed_block) + 25)
+        self._file.write(BGZF_BASE_HEADER)
+        if self.compresslevel:
+            compressed_block = self._compress(data_view, self.compresslevel,
+                                              wbits=-zlib.MAX_WBITS)
+            # Length of the compressed block + generic gzip header (10 bytes) +
+            # XLEN field (2 bytes)
+            bgzf_block_size_bytes = struct.pack("<H", len(compressed_block) + 25)
+            self._file.write(bgzf_block_size_bytes)
+            self._file.write(compressed_block)
+        else:
+            data_length = self._buffer_size
+            size_and_deflate_header = struct.pack(
+                "<HBHH",
+                data_length + 5,
+                # Deflate block header: first bit signifying last block;
+                # second and third bit 0 and 0 means uncompressed block.
+                1,
+                data_length,  # LEN
+                ~data_length & 0xFFFF,  # NLEN
+            )
+            self._file.write(size_and_deflate_header)
+            self._file.write(data_view)
         trailer = struct.pack("<II",
                               self._crc32(data_view),
                               data_view.nbytes & 0xFFFFFFFF)
-        self._file.write(BGZF_BASE_HEADER)
-        self._file.write(bgzf_block_size_bytes)
-        self._file.write(compressed_block)
         self._file.write(trailer)
         self._buffer_size = 0
         self._buffer.seek(0)
