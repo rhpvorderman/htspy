@@ -74,7 +74,7 @@ def decompress_bgzf_blocks(file: io.BufferedReader) -> Iterator[bytes]:
         block_peek = file.peek(1)
         if block_peek[0] == 1:  # No compression.
             length, inverse_length = struct.unpack("<HH", file.read(5)[1:])
-            if length != ~inverse_length & 0xFFFF or length != block_size -5:
+            if length != ~inverse_length & 0xFFFF or length != block_size - 5:
                 raise BGZFError(f"Corrupted uncompressed block at {block_pos}")
             decompressed_block = file.read(length)
         else:
@@ -169,7 +169,7 @@ class BGZFReader:
         return self._buffer.read()
 
 
-def _zlib_compress(data, level, wbits):
+def _zlib_compress(data, level: int = -1, wbits: int = zlib.MAX_WBITS) -> bytes:
     """zlib.compress but with a wbits parameter."""
     compressobj = zlib.compressobj(level, wbits=wbits)
     return compressobj.compress(data) + compressobj.flush()
