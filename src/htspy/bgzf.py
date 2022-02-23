@@ -195,9 +195,14 @@ class BGZFWriter:
 
     def close(self):
         self.flush()
-        self.flush()  # Second flush writes empty EOF block.
+        self.write_eof_block()
         self._buffer.close()
         self._file.close()
+
+    def write_eof_block(self):
+        self._file.write(b"\x1f\x8b\x08\x04\x00\x00\x00\x00\x00\xff\x06\x00"
+                         b"\x42\x43\x02\x00\x1b\x00\x03\x00\x00\x00\x00\x00"
+                         b"\x00\x00\x00\x00")
 
     def __enter__(self):
         return self
@@ -207,9 +212,19 @@ class BGZFWriter:
 
     def flush(self):
         data_view = self._buffer.getbuffer()[:self._buffer_size]
+        self.write_block(data_view)
+        self._buffer_size = 0
+        self._buffer.seek(0)
+
+    def write_block(self, data):
+        """Write a block of data immediately to the BGZF file as a block."""
+        data_length = len(data)
+        if data_length > BGZF_BLOCK_SIZE:
+            raise ValueError(f"Cannot write data larger than "
+                             f"{BGZF_BLOCK_SIZE} to a BGZF block.")
         self._file.write(BGZF_BASE_HEADER)
         if self.compresslevel:
-            compressed_block = self._compress(data_view, self.compresslevel,
+            compressed_block = self._compress(data, self.compresslevel,
                                               wbits=-zlib.MAX_WBITS)
             # Length of the compressed block + generic gzip header (10 bytes) +
             # XLEN field (2 bytes)
@@ -217,7 +232,6 @@ class BGZFWriter:
             self._file.write(bgzf_block_size_bytes)
             self._file.write(compressed_block)
         else:
-            data_length = self._buffer_size
             size_and_deflate_header = struct.pack(
                 "<HBHH",
                 data_length + 5,
@@ -228,13 +242,11 @@ class BGZFWriter:
                 ~data_length & 0xFFFF,  # NLEN
             )
             self._file.write(size_and_deflate_header)
-            self._file.write(data_view)
+            self._file.write(data)
         trailer = struct.pack("<II",
-                              self._crc32(data_view),
-                              data_view.nbytes & 0xFFFFFFFF)
+                              self._crc32(data),
+                              data_length)
         self._file.write(trailer)
-        self._buffer_size = 0
-        self._buffer.seek(0)
 
     def write(self, data):
         data_length = len(data)
@@ -251,12 +263,3 @@ class BGZFWriter:
             self._buffer.write(data)
             self._buffer_size = new_size
         return data_length
-
-    def write_block(self, data):
-        data_length = len(data)
-        new_size = self._buffer_size + data_length
-        if new_size > BGZF_BLOCK_SIZE:
-            self.flush()
-            new_size = data_length
-        self._buffer.write(data)
-        self._buffer_size = new_size
