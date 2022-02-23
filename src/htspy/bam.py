@@ -172,6 +172,7 @@ class BamWriter:
         self._buffer_size = 0
 
     def close(self):
+        self.flush()
         self._file.close()
 
     def __enter__(self):
@@ -182,6 +183,11 @@ class BamWriter:
 
     def _write_header(self):
         self._file.write(self.header.to_bytes())
+
+    def flush(self):
+        block = self._buffer.getbuffer()[:self._buffer_size]
+        self._file.write_block(block)
+        self._buffer_size = 0
 
     def write(self, bam_record: BamRecord):
         data = bam_record.to_bytes()
