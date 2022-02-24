@@ -426,6 +426,29 @@ static PyTypeObject BamRecord_Type = {
 };
 
 typedef struct {
+    PyObject_HEAD
+    Py_ssize_t buffersize; 
+    Py_ssize_t pos;
+    char * buffer;
+} BamBlockBuffer;
+
+static void 
+BamBlockBuffer_dealloc(BamBlockBuffer *self) {
+    PyMem_Free(self->buffer);
+    Py_TYPE(self)->tp_free(self);
+}
+
+static int 
+BamBlockBuffer__init__(BamBlockBuffer * self, PyObject *args, PyObject *kwargs) {
+    self->buffer = NULL
+    Py_ssize_t buffersize = 0
+    if (!PyArg_ParseTupleAndKeywords(
+        args, kwargs, "n|:BamBlockBuffer" {"", NULL}, &buffersize)) {
+            return NULL;
+    }
+}
+
+typedef struct {
     PyObject_HEAD 
     Py_buffer view; 
     char * buf;
