@@ -493,7 +493,7 @@ PyDoc_STRVAR(BamBlockBuffer_write_doc,
 "Returns the amount of bytes written. Returns 0 if the BamRecord does not\n"
 "fit in the buffer anymore");
 
-#define BAMRECORD_TO_BYTES_METHODDEF    \
+#define BAMBLOCKBUFFER_WRITE_METHODDEF    \
     {"write", (PyCFunction)(void(*)(void))BamBlockBuffer_write, METH_O, \
      BamBlockBuffer_write_doc}
 
@@ -515,7 +515,7 @@ static PyObject * BamBlockBuffer_write(BamBlockBuffer * self, BamRecord * bam_re
 PyDoc_STRVAR(BamBlockBuffer_reset_doc,
 "Remove all records from the buffer.");
 
-#define BAMRECORD_TO_BYTES_METHODDEF    \
+#define BAMBLOCKBUFFER_RESET_METHODDEF    \
     {"reset", (PyCFunction)(void(*)(void))BamBlockBuffer_reset, METH_NOARGS, \
      BamBlockBuffer_reset_doc}
 
@@ -525,6 +525,11 @@ BamBlockBuffer_reset(BamBlockBuffer * self, PyObject *Py_UNUSED(ignore)) {
     Py_RETURN_NONE;
 }
 
+static PyMethodDef BamBlockBuffer_methods[] = {
+    BAMBLOCKBUFFER_WRITE_METHODDEF,
+    BAMBLOCKBUFFER_RESET_METHODDEF,
+    {NULL},
+};
 
 static PyTypeObject BamBlockBuffer_type = {
     .tp_name = "_bam.BamBlockBuffer",
@@ -534,6 +539,8 @@ static PyTypeObject BamBlockBuffer_type = {
     .tp_new = PyType_GenericNew,
     .tp_as_sequence = &BamBlockBuffer_as_sequence,
     .tp_doc = BamBlockBuffer__doc__,
+    .tp_members = BamBlockBuffer_members,
+    .tp_methods = BamBlockBuffer_methods,
 };
 
 typedef struct {
