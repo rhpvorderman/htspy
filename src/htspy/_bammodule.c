@@ -427,6 +427,9 @@ static PyTypeObject BamRecord_Type = {
     .tp_new = PyType_GenericNew,
 };
 
+PyDoc_STRVAR(BamBlockBuffer__doc__, 
+"A structure to create a BGZF block from BamRecord objects.\n");
+
 typedef struct {
     PyObject_HEAD
     Py_ssize_t buffersize; 
@@ -448,19 +451,22 @@ BamBlockBuffer__init__(BamBlockBuffer * self, PyObject *args, PyObject *kwargs) 
     const char * keywords[] = {"", NULL};
     if (!PyArg_ParseTupleAndKeywords(
         args, kwargs, "|n:BamBlockBuffer", keywords, &buffersize)) {
-            return NULL;
+            return -1;
     }
     if (buffersize < 0) {
         PyErr_Format(PyExc_ValueError, 
                      "buffer size must be larger than 0. Got: %ld", buffersize);
+        return -1;
     }
     tmp = (char *)PyMem_Malloc(buffersize);
     if (tmp == NULL) {
-        return PyErr_NoMemory();
+        PyErr_NoMemory();
+        return -1;
     }
     self->buffer = tmp; 
     self->buffersize = buffersize;
     self->pos = 0;
+    return 0;
 }
 
 static PyMemberDef BamBlockBuffer_members[] = {
@@ -478,13 +484,39 @@ static PySequenceMethods BamBlockBuffer_as_sequence = {
     .sq_length = (lenfunc)BamBlockBuffer__len__
 };
 
+PyDoc_STRVAR(BamBlockBuffer_write_doc,
+"Write a BamRecord object into the BamBlockBuffer.\n"
+"\n"
+"Returns the amount of bytes written. Returns 0 if the BamRecord does not\n"
+"fit in the buffer anymore");
+
+#define BAMRECORD_TO_BYTES_METHODDEF    \
+    {"write", (PyCFunction)(void(*)(void))BamRecord_to_bytes, METH_O, \
+     BamBlockBuffer_write_doc}
+
+static PyObject * BamBlockBuffer_write(BamBlockBuffer * self, BamRecord * bam_record) {
+    if (Py_TYPE(bam_record) != &BamRecord_Type) {
+        PyErr_Format(PyExc_TypeError, "Type must be BamRecord, got: %s", 
+                     Py_TYPE(bam_record)->tp_name);
+        return NULL;
+    }
+    Py_ssize_t record_size = bam_record->block_size + sizeof(bam_record->block_size);
+    Py_ssize_t final_pos = self->pos + record_size;
+    if (final_pos > self->buffersize) {
+        return PyLong_FromSsize_t(0);
+    }
+    
+
+} 
+
 static PyTypeObject BamBlockBuffer_type = {
     .tp_name = "_bam.BamBlockBuffer",
     .tp_basicsize = sizeof(BamBlockBuffer),
     .tp_dealloc = BamBlockBuffer_dealloc,
     .tp_init = BamBlockBuffer__init__, 
     .tp_new = PyType_GenericNew,
-    .tp_as_sequence = &BamBlockBuffer_as_sequence
+    .tp_as_sequence = &BamBlockBuffer_as_sequence,
+    .tp_doc = BamBlockBuffer__doc__,
 };
 
 typedef struct {
