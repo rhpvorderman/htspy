@@ -23,7 +23,7 @@ import typing
 from typing import Dict, Iterator, List, Tuple
 
 from ._bam import BamRecord, bam_iterator
-from .bgzf import BGZFReader, BGZFWriter
+from .bgzf import BGZFReader, BGZFWriter, BGZF_BLOCK_SIZE
 
 
 class BAMFormatError(Exception):
@@ -168,8 +168,11 @@ class BamWriter:
         self._file = BGZFWriter(filename, compresslevel)
         self.header = header
         self._write_header()
+        self._buffer = io.BytesIO(bytes(65536))
+        self._buffer_size = 0
 
     def close(self):
+        self.flush()
         self._file.close()
 
     def __enter__(self):
@@ -181,5 +184,24 @@ class BamWriter:
     def _write_header(self):
         self._file.write(self.header.to_bytes())
 
+    def flush(self):
+        block = self._buffer.getbuffer()[:self._buffer_size]
+        self._file.write_block(block)
+        self._buffer_size = 0
+
     def write(self, bam_record: BamRecord):
-        self._file.write_block(bam_record.to_bytes())
+        data = bam_record.to_bytes()
+        data_length = len(data)
+        new_size = self._buffer_size + data_length
+        if new_size > BGZF_BLOCK_SIZE:
+            block = self._buffer.getbuffer()[:self._buffer_size]
+            self._file.write_block(block)
+            self._buffer.seek(0)
+            self._buffer_size = 0
+            if data_length > BGZF_BLOCK_SIZE:
+                # Distribute the data over multiple blocks
+                self._file.write(data)
+                self._file.flush()
+        else:
+            self._buffer.write(data)
+            self._buffer_size = new_size
