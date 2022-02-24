@@ -512,9 +512,21 @@ PyDoc_STRVAR(BamBlockBuffer_reset_doc,
      BamBlockBuffer_reset_doc}
 
 static PyObject * 
-BamBlockBuffer_reset(BamBlockBuffer * self, PyObject *Py_UNUSED(ignore)) {
+BamBlockBuffer_reset(BamBlockBuffer *self, PyObject *Py_UNUSED(ignore)) {
     self->pos = 0;
     Py_RETURN_NONE;
+}
+
+PyDoc_STRVAR(BamBlockBuffer_get_block_view_doc,
+"Return a memoryview over all the memory blocks written so far.");
+
+#define BAMBLOCKBUFFER_GET_BLOCK_VIEW_METHODDEF    \
+    {"get_block_view", (PyCFunction)(void(*)(void))BamBlockBuffer_get_block_view, \
+     METH_NOARGS, BamBlockBuffer_get_block_view_doc}
+
+static PyObject * 
+BamBlockBuffer_get_block_view(BamBlockBuffer *self, PyObject *Py_UNUSED(ignore)) {
+    return PyMemoryView_FromMemory(self->buffer, self->pos, PyBUF_READ);
 }
 
 static PyMethodDef BamBlockBuffer_methods[] = {
