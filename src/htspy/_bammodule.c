@@ -451,7 +451,7 @@ BamBlockBuffer__init__(BamBlockBuffer * self, PyObject *args, PyObject *kwargs) 
     Py_ssize_t buffersize = BGZF_BLOCK_SIZE;
     self->buffer = NULL;
     char * tmp;
-    const char * keywords[] = {"", NULL};
+    char * keywords[] = {"", NULL};
     if (!PyArg_ParseTupleAndKeywords(
         args, kwargs, "|n:BamBlockBuffer", keywords, &buffersize)) {
             return -1;
@@ -532,14 +532,15 @@ BamBlockBuffer_get_block_view(BamBlockBuffer *self, PyObject *Py_UNUSED(ignore))
 static PyMethodDef BamBlockBuffer_methods[] = {
     BAMBLOCKBUFFER_WRITE_METHODDEF,
     BAMBLOCKBUFFER_RESET_METHODDEF,
+    BAMBLOCKBUFFER_GET_BLOCK_VIEW_METHODDEF,
     {NULL},
 };
 
 static PyTypeObject BamBlockBuffer_type = {
     .tp_name = "_bam.BamBlockBuffer",
     .tp_basicsize = sizeof(BamBlockBuffer),
-    .tp_dealloc = BamBlockBuffer_dealloc,
-    .tp_init = BamBlockBuffer__init__, 
+    .tp_dealloc = (destructor)BamBlockBuffer_dealloc,
+    .tp_init = (initproc)BamBlockBuffer__init__, 
     .tp_new = PyType_GenericNew,
     .tp_doc = BamBlockBuffer__doc__,
     .tp_members = BamBlockBuffer_members,
