@@ -25,6 +25,8 @@
 
 #include "htslib/sam.h"
 
+#define BGZF_BLOCK_SIZE 0xff00  // From bgzf.h
+
 typedef struct {
     PyObject_HEAD
     uint32_t block_size;
@@ -440,13 +442,27 @@ BamBlockBuffer_dealloc(BamBlockBuffer *self) {
 
 static int 
 BamBlockBuffer__init__(BamBlockBuffer * self, PyObject *args, PyObject *kwargs) {
-    self->buffer = NULL
-    Py_ssize_t buffersize = 0
+    Py_ssize_t buffersize = BGZF_BLOCK_SIZE;
+    self->buffer = NULL;
+    char * tmp;
+    const char * keywords[] = {"", NULL};
     if (!PyArg_ParseTupleAndKeywords(
-        args, kwargs, "n|:BamBlockBuffer" {"", NULL}, &buffersize)) {
+        args, kwargs, "|n:BamBlockBuffer", keywords, &buffersize)) {
             return NULL;
     }
+    if (buffersize < 0) {
+        PyErr_Format(PyExc_ValueError, 
+                     "buffer size must be larger than 0. Got: %ld", buffersize);
+    }
+    tmp = (char *)PyMem_Malloc(buffersize);
+    if (tmp == NULL) {
+        return PyErr_NoMemory();
+    }
+    self->buffer = tmp; 
+    self->buffersize = buffersize;
+    self->pos = 0;
 }
+
 
 typedef struct {
     PyObject_HEAD 
