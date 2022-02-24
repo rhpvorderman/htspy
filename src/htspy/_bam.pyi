@@ -71,6 +71,7 @@ class BamBlockBuffer:
 
     def reset(self): ...  
 
+    def get_block_view(self) -> memoryview: ...
 
 BAM_CMATCH: int 
 BAM_CINS: int 
