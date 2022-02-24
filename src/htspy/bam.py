@@ -183,6 +183,7 @@ class BamWriter:
 
     def _write_header(self):
         self._file.write(self.header.to_bytes())
+        self._file.flush()
 
     def flush(self):
         self._file.write_block(self._buffer.get_block_view())
