@@ -365,7 +365,7 @@ PyDoc_STRVAR(BamRecord_to_bytes__doc__,
     {"to_bytes", (PyCFunction)(void(*)(void))BamRecord_to_bytes, METH_NOARGS, \
      BamRecord_to_bytes__doc__}
 
-static inline void 
+static void 
 BamRecord_to_ptr(BamRecord *self, char * dest) {
     memcpy(dest, (char *)self + BAM_PROPERTIES_STRUCT_START,
          BAM_PROPERTIES_STRUCT_SIZE);
