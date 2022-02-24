@@ -234,7 +234,7 @@ class BGZFWriter:
         else:
             size_and_deflate_header = struct.pack(
                 "<HBHH",
-                data_length + 5,
+                data_length + 30,  # +5 for deflate header, + 25 for rest of block.
                 # Deflate block header: first bit signifying last block;
                 # second and third bit 0 and 0 means uncompressed block.
                 1,

@@ -25,6 +25,8 @@
 
 #include "htslib/sam.h"
 
+#define BGZF_BLOCK_SIZE 0xff00  // From bgzf.h
+
 typedef struct {
     PyObject_HEAD
     uint32_t block_size;
@@ -363,6 +365,35 @@ PyDoc_STRVAR(BamRecord_to_bytes__doc__,
     {"to_bytes", (PyCFunction)(void(*)(void))BamRecord_to_bytes, METH_NOARGS, \
      BamRecord_to_bytes__doc__}
 
+static void 
+BamRecord_to_ptr(BamRecord *self, char * dest) {
+    memcpy(dest, (char *)self + BAM_PROPERTIES_STRUCT_START,
+         BAM_PROPERTIES_STRUCT_SIZE);
+    Py_ssize_t cursor = BAM_PROPERTIES_STRUCT_SIZE;
+    
+    Py_ssize_t read_name_size = PyBytes_GET_SIZE(self->read_name);
+    memcpy(dest + cursor, PyBytes_AS_STRING(self->read_name), read_name_size);
+    cursor += read_name_size;
+
+    // Terminate read_name with NULL byte
+    dest[cursor] = 0; cursor += 1;
+
+    Py_ssize_t cigar_size = PyBytes_GET_SIZE(self->cigar);
+    memcpy(dest + cursor, PyBytes_AS_STRING(self->cigar), cigar_size);
+    cursor += cigar_size;
+
+    Py_ssize_t seq_size = PyBytes_GET_SIZE(self->seq);
+    memcpy(dest + cursor, PyBytes_AS_STRING(self->seq), seq_size);
+    cursor += seq_size;
+
+    Py_ssize_t qual_size = PyBytes_GET_SIZE(self->qual);
+    memcpy(dest + cursor, PyBytes_AS_STRING(self->qual), qual_size);
+    cursor += qual_size;
+
+    Py_ssize_t tag_size = PyBytes_GET_SIZE(self->tags);
+    memcpy(dest + cursor, PyBytes_AS_STRING(self->tags), tag_size);
+}
+
 static PyObject *
 BamRecord_to_bytes(BamRecord *self, PyObject *NoArgs)
 {
@@ -372,33 +403,7 @@ BamRecord_to_bytes(BamRecord *self, PyObject *NoArgs)
         return PyErr_NoMemory();
     }
     char * bam_bytes = PyBytes_AS_STRING(ret_val);
-    
-    memcpy(bam_bytes, (char *)self + BAM_PROPERTIES_STRUCT_START,
-         BAM_PROPERTIES_STRUCT_SIZE);
-    Py_ssize_t cursor = BAM_PROPERTIES_STRUCT_SIZE;
-    
-    Py_ssize_t read_name_size = PyBytes_GET_SIZE(self->read_name);
-    memcpy(bam_bytes + cursor, PyBytes_AS_STRING(self->read_name), read_name_size);
-    cursor += read_name_size;
-
-    // Terminate read_name with NULL byte
-    bam_bytes[cursor] = 0; cursor += 1;
-
-    Py_ssize_t cigar_size = PyBytes_GET_SIZE(self->cigar);
-    memcpy(bam_bytes + cursor, PyBytes_AS_STRING(self->cigar), cigar_size);
-    cursor += cigar_size;
-
-    Py_ssize_t seq_size = PyBytes_GET_SIZE(self->seq);
-    memcpy(bam_bytes + cursor, PyBytes_AS_STRING(self->seq), seq_size);
-    cursor += seq_size;
-
-    Py_ssize_t qual_size = PyBytes_GET_SIZE(self->qual);
-    memcpy(bam_bytes + cursor, PyBytes_AS_STRING(self->qual), qual_size);
-    cursor += qual_size;
-
-    Py_ssize_t tag_size = PyBytes_GET_SIZE(self->tags);
-    memcpy(bam_bytes + cursor, PyBytes_AS_STRING(self->tags), tag_size);
-
+    BamRecord_to_ptr(self, bam_bytes);
     return ret_val;
 }
 
@@ -423,6 +428,125 @@ static PyTypeObject BamRecord_Type = {
     .tp_getset = BamRecord_properties,
     .tp_init = (initproc)BamRecord_init,
     .tp_new = PyType_GenericNew,
+};
+
+PyDoc_STRVAR(BamBlockBuffer__doc__, 
+"A structure to create a BGZF block from BamRecord objects.\n");
+
+typedef struct {
+    PyObject_HEAD
+    Py_ssize_t buffersize; 
+    Py_ssize_t pos;
+    char * buffer;
+} BamBlockBuffer;
+
+static void 
+BamBlockBuffer_dealloc(BamBlockBuffer *self) {
+    PyMem_Free(self->buffer);
+    Py_TYPE(self)->tp_free(self);
+}
+
+static int 
+BamBlockBuffer__init__(BamBlockBuffer * self, PyObject *args, PyObject *kwargs) {
+    Py_ssize_t buffersize = BGZF_BLOCK_SIZE;
+    self->buffer = NULL;
+    char * tmp;
+    char * keywords[] = {"", NULL};
+    if (!PyArg_ParseTupleAndKeywords(
+        args, kwargs, "|n:BamBlockBuffer", keywords, &buffersize)) {
+            return -1;
+    }
+    if (buffersize < 0) {
+        PyErr_Format(PyExc_ValueError, 
+                     "buffer size must be larger than 0. Got: %ld", buffersize);
+        return -1;
+    }
+    tmp = (char *)PyMem_Malloc(buffersize);
+    if (tmp == NULL) {
+        PyErr_NoMemory();
+        return -1;
+    }
+    self->buffer = tmp; 
+    self->buffersize = buffersize;
+    self->pos = 0;
+    return 0;
+}
+
+static PyMemberDef BamBlockBuffer_members[] = {
+    {"buffersize", T_PYSSIZET, offsetof(BamBlockBuffer, buffersize), READONLY,
+     "The size of the internal buffer."},
+    {"bytes_written", T_PYSSIZET, offsetof(BamBlockBuffer, pos), READONLY, 
+     "The number of bytes written in the internal buffer."},
+    {NULL}
+};
+
+
+PyDoc_STRVAR(BamBlockBuffer_write_doc,
+"Write a BamRecord object into the BamBlockBuffer.\n"
+"\n"
+"Returns the amount of bytes written. Returns 0 if the BamRecord does not\n"
+"fit in the buffer anymore");
+
+#define BAMBLOCKBUFFER_WRITE_METHODDEF    \
+    {"write", (PyCFunction)(void(*)(void))BamBlockBuffer_write, METH_O, \
+     BamBlockBuffer_write_doc}
+
+static PyObject * BamBlockBuffer_write(BamBlockBuffer * self, BamRecord * bam_record) {
+    if (Py_TYPE(bam_record) != &BamRecord_Type) {
+        PyErr_Format(PyExc_TypeError, "Type must be BamRecord, got: %s", 
+                     Py_TYPE(bam_record)->tp_name);
+        return NULL;
+    }
+    Py_ssize_t record_size = bam_record->block_size + sizeof(bam_record->block_size);
+    Py_ssize_t final_pos = self->pos + record_size;
+    if (final_pos > self->buffersize) {
+        return PyLong_FromSsize_t(0);
+    }
+    BamRecord_to_ptr(bam_record, self->buffer + self->pos);
+    self->pos = final_pos; 
+    return PyLong_FromSsize_t(record_size);
+}
+PyDoc_STRVAR(BamBlockBuffer_reset_doc,
+"Remove all records from the buffer.");
+
+#define BAMBLOCKBUFFER_RESET_METHODDEF    \
+    {"reset", (PyCFunction)(void(*)(void))BamBlockBuffer_reset, METH_NOARGS, \
+     BamBlockBuffer_reset_doc}
+
+static PyObject * 
+BamBlockBuffer_reset(BamBlockBuffer *self, PyObject *Py_UNUSED(ignore)) {
+    self->pos = 0;
+    Py_RETURN_NONE;
+}
+
+PyDoc_STRVAR(BamBlockBuffer_get_block_view_doc,
+"Return a memoryview over all the memory blocks written so far.");
+
+#define BAMBLOCKBUFFER_GET_BLOCK_VIEW_METHODDEF    \
+    {"get_block_view", (PyCFunction)(void(*)(void))BamBlockBuffer_get_block_view, \
+     METH_NOARGS, BamBlockBuffer_get_block_view_doc}
+
+static PyObject * 
+BamBlockBuffer_get_block_view(BamBlockBuffer *self, PyObject *Py_UNUSED(ignore)) {
+    return PyMemoryView_FromMemory(self->buffer, self->pos, PyBUF_READ);
+}
+
+static PyMethodDef BamBlockBuffer_methods[] = {
+    BAMBLOCKBUFFER_WRITE_METHODDEF,
+    BAMBLOCKBUFFER_RESET_METHODDEF,
+    BAMBLOCKBUFFER_GET_BLOCK_VIEW_METHODDEF,
+    {NULL},
+};
+
+static PyTypeObject BamBlockBuffer_Type = {
+    .tp_name = "_bam.BamBlockBuffer",
+    .tp_basicsize = sizeof(BamBlockBuffer),
+    .tp_dealloc = (destructor)BamBlockBuffer_dealloc,
+    .tp_init = (initproc)BamBlockBuffer__init__, 
+    .tp_new = PyType_GenericNew,
+    .tp_doc = BamBlockBuffer__doc__,
+    .tp_members = BamBlockBuffer_members,
+    .tp_methods = BamBlockBuffer_methods,
 };
 
 typedef struct {
@@ -585,6 +709,14 @@ PyInit__bam(void)
     PyObject * BamRecordType = (PyObject *)&BamRecord_Type;
     Py_INCREF(BamRecordType);
     if (PyModule_AddObject(m, "BamRecord", BamRecordType) < 0) {
+        return NULL;
+    }
+
+    if (PyType_Ready(&BamBlockBuffer_Type) < 0)
+        return NULL;
+    PyObject * BamBlockBufferType = (PyObject *)&BamBlockBuffer_Type;
+    Py_INCREF(BamBlockBufferType);
+    if (PyModule_AddObject(m, "BamBlockBuffer", BamBlockBufferType) < 0) {
         return NULL;
     }
 
