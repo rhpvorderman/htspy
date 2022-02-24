@@ -22,8 +22,8 @@ import struct
 import typing
 from typing import Dict, Iterator, List, Tuple
 
-from ._bam import BamRecord, bam_iterator
 from ._bam import BamBlockBuffer as _BamBlockBuffer
+from ._bam import BamRecord, bam_iterator
 from .bgzf import BGZFReader, BGZFWriter, BGZF_BLOCK_SIZE
 
 
