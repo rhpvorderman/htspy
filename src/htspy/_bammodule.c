@@ -536,7 +536,7 @@ static PyMethodDef BamBlockBuffer_methods[] = {
     {NULL},
 };
 
-static PyTypeObject BamBlockBuffer_type = {
+static PyTypeObject BamBlockBuffer_Type = {
     .tp_name = "_bam.BamBlockBuffer",
     .tp_basicsize = sizeof(BamBlockBuffer),
     .tp_dealloc = (destructor)BamBlockBuffer_dealloc,
@@ -707,6 +707,14 @@ PyInit__bam(void)
     PyObject * BamRecordType = (PyObject *)&BamRecord_Type;
     Py_INCREF(BamRecordType);
     if (PyModule_AddObject(m, "BamRecord", BamRecordType) < 0) {
+        return NULL;
+    }
+
+    if (PyType_Ready(&BamBlockBuffer_Type) < 0)
+        return NULL;
+    PyObject * BamBlockBufferType = (PyObject *)&BamBlockBuffer_Type;
+    Py_INCREF(BamBlockBufferType);
+    if (PyModule_AddObject(m, "BamBlockBuffer", BamBlockBufferType) < 0) {
         return NULL;
     }
 
