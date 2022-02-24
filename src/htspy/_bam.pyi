@@ -61,6 +61,17 @@ class BamRecord:
 
 def bam_iterator(data) -> Iterator[BamRecord]: ...
 
+class BamBlockBuffer:
+    buffersize: int
+    bytes_written: int
+
+    def __init__(self, buffersize: int): ... 
+
+    def write(self, bam_record: BamRecord) -> int: ... 
+
+    def reset(self): ...  
+
+
 BAM_CMATCH: int 
 BAM_CINS: int 
 BAM_CDEL: int 

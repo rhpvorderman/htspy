@@ -473,8 +473,10 @@ BamBlockBuffer__init__(BamBlockBuffer * self, PyObject *args, PyObject *kwargs) 
 }
 
 static PyMemberDef BamBlockBuffer_members[] = {
-    {"size", T_PYSSIZET, offsetof(BamBlockBuffer, buffersize), READONLY},
-    {"_pos", T_PYSSIZET, offsetof(BamBlockBuffer, pos), READONLY},
+    {"buffersize", T_PYSSIZET, offsetof(BamBlockBuffer, buffersize), READONLY,
+     "The size of the internal buffer."},
+    {"bytes_written", T_PYSSIZET, offsetof(BamBlockBuffer, pos), READONLY, 
+     "The number of bytes written in the internal buffer."},
     {NULL}
 };
 
