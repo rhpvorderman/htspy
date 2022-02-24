@@ -463,6 +463,29 @@ BamBlockBuffer__init__(BamBlockBuffer * self, PyObject *args, PyObject *kwargs) 
     self->pos = 0;
 }
 
+static PyMemberDef BamBlockBuffer_members[] = {
+    {"size", T_PYSSIZET, offsetof(BamBlockBuffer, buffersize), READONLY},
+    {"_pos", T_PYSSIZET, offsetof(BamBlockBuffer, pos), READONLY},
+    {NULL}
+};
+
+static Py_ssize_t 
+BamBlockBuffer__len__(BamBlockBuffer * self) {
+    return self->pos;
+}
+
+static PySequenceMethods BamBlockBuffer_as_sequence = {
+    .sq_length = (lenfunc)BamBlockBuffer__len__
+};
+
+static PyTypeObject BamBlockBuffer_type = {
+    .tp_name = "_bam.BamBlockBuffer",
+    .tp_basicsize = sizeof(BamBlockBuffer),
+    .tp_dealloc = BamBlockBuffer_dealloc,
+    .tp_init = BamBlockBuffer__init__, 
+    .tp_new = PyType_GenericNew,
+    .tp_as_sequence = &BamBlockBuffer_as_sequence
+};
 
 typedef struct {
     PyObject_HEAD 
