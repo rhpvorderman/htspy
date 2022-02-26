@@ -20,11 +20,11 @@
 import io
 import struct
 import typing
-from typing import Dict, Iterator, List, Tuple
+from typing import BinaryIO, Dict, Iterator, List, Optional, Tuple
 
 from ._bam import BamBlockBuffer as _BamBlockBuffer
 from ._bam import BamRecord, bam_iterator
-from .bgzf import BGZFReader, BGZFWriter, BGZF_BLOCK_SIZE
+from .bgzf import BGZFReader, BGZFWriter, BGZF_BLOCK_SIZE, VirtualFileOffset
 
 
 class BAMFormatError(Exception):
@@ -39,6 +39,39 @@ class BamReference(typing.NamedTuple):
         nlen = struct.pack("<I", len(self.name))
         seq_len = struct.pack("<I", self.length)
         return nlen + self.name.encode('ascii', 'strict') + seq_len
+
+
+class ContigIndex:
+    binning_indices: Dict[int,
+                          List[Tuple[VirtualFileOffset, VirtualFileOffset]]]
+    linear_indices: Dict[int, VirtualFileOffset]
+    reference_begin: Optional[VirtualFileOffset] = None
+    reference_end: Optional[VirtualFileOffset] = None
+    number_of_mapped_reads: Optional[int] = None
+    number_of_placed_unmapped_reads: Optional[int] = None
+
+    @classmethod
+    def from_fileobj(cls, fileobj: BinaryIO):
+        binning_indices = {}
+        linear_indices = {}
+        n_bin, = struct.unpack("<I", fileobj.read(4))
+        for i in range(n_bin):
+            bin, n_chunk = struct.unpack("<II", fileobj.read(8))
+            chunk_list = []
+            for j in range(n_chunk):
+                chunk_beg, chunk_end = struct.unpack("<QQ", fileobj.read(16))
+                chunk_list.append(
+                    (VirtualFileOffset.from_bytes(chunk_beg),
+                     VirtualFileOffset.from_bytes(chunk_end))
+                )
+            binning_indices[bin] = chunk_list
+        n_intv = struct.unpack("<II", fileobj.read(4))
+        # TODO: Continue
+
+
+class BamIndex:
+    contig_indices: List[ContigIndex]
+    number_of_unplaced_unmapped_reads: Optional[int] = None
 
 
 class BamHeader:
