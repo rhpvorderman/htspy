@@ -20,6 +20,7 @@
 
 import io
 import struct
+import typing
 import zlib
 from typing import Iterator, Optional
 
@@ -40,6 +41,18 @@ BGZF_BASE_HEADER = b"\x1f\x8b\x08\x04\x00\x00\x00\x00\x00\xff\x06\x00\x42\x43\x0
 
 class BGZFError(IOError):
     pass
+
+
+class VirtualFileOffset(typing.NamedTuple):
+    coffset: int
+    uoffset: int
+
+    @classmethod
+    def from_bytes(cls, b: bytes):
+        virtual_offset, = struct.unpack("<Q", b)
+        coffset = virtual_offset >> 16
+        uoffset = virtual_offset & 0xffff
+        return cls(coffset, uoffset)
 
 
 def decompress_bgzf_blocks(file: io.BufferedReader) -> Iterator[bytes]:
