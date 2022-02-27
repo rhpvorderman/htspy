@@ -128,6 +128,13 @@ class BGZFReader:
         self._block_iter = decompress_bgzf_blocks(self._file)  # type: ignore
         self._buffer = io.BytesIO()
         self._buffer_size = 0
+        if isal_zlib:
+            self._decompress = isal_zlib.decompress
+            self._crc32 = isal_zlib.crc32
+        else:
+            self._decompress = zlib.decompress
+            self._crc32 = zlib.crc32  # type: ignore
+        self._last_block_eof = False
 
     def close(self):
         self._buffer.close()
@@ -138,6 +145,60 @@ class BGZFReader:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
+
+    def read_block(self):
+        """Read the BGZF file up to the next block boundary"""
+        header = self._file.read(18)
+        if not header:
+            if self._last_block_eof:
+                return b""
+            else:
+                raise EOFError("Truncated BGZF file. No EOF block found.")
+        if len(header) < 18:
+            raise EOFError(f"Truncated bgzf block.")
+        magic, method, flags, mtime, xfl, os, xlen, si1, si2, slen, bsize = \
+            struct.unpack("<HBBIBBHBBHH", header)
+        if magic != GZIP_MAGIC_INT:
+            raise BGZFError(f"Incorrect gzip magic: {struct.pack('<H', magic)}")
+        if method != 8:  # Deflate method
+            raise BGZFError(f"Unsupported compression method: {method}")
+        if not flags & 4:
+            raise BGZFError(f"Gzip block should contain an extra field.")
+        if xlen < 6:
+            raise BGZFError(f"XLEN too small")
+        if not (si1 == 66 and si2 == 67 and slen == 2):
+            raise BGZFError(f"Invalid BSIZE fields")
+        # Skip other xtra fields.
+        self._file.read(xlen - 6)
+        block_size = bsize - xlen - 19
+        block_peek = self._file.peek(1)
+        if block_peek[0] == 1:  # No compression.
+            length, inverse_length = struct.unpack("<HH", self._file.read(5)[1:])
+            if length != ~inverse_length & 0xFFFF or length != block_size - 5:
+                raise BGZFError(f"Corrupted uncompressed block.")
+            decompressed_block = self._file.read(length)
+        else:
+            block = self._file.read(block_size)
+            if len(block) < block_size:
+                raise EOFError(f"Truncated block.")
+            # Decompress block, use the 64K as initial buffer size to avoid
+            # resizing of the buffer. (Max block size before compressing is
+            # slightly less than 64K for BGZF blocks). 64K is allocated faster
+            # than sizes that are not powers of 2.
+            decompressed_block = self._decompress(block,
+                                                  wbits=-zlib.MAX_WBITS,
+                                                  bufsize=65536)
+        trailer = self._file.read(8)
+        if len(trailer) < 8:
+            raise EOFError(f"Truncated block.")
+        crc, isize = struct.unpack("<II", trailer)
+        if crc != self._crc32(decompressed_block):
+            raise BGZFError("Checksum fail of decompressed block")
+        if isize != len(decompressed_block):
+            raise BGZFError("Incorrect length of decompressed blocks.")
+        # Empty block signifies EOF.
+        self._last_block_eof = bool(decompressed_block)
+        return decompressed_block
 
     def __iter__(self):
         return self._block_iter
@@ -200,14 +261,12 @@ class BGZFWriter:
         self._buffer_size = 0
         self._buffer.seek(0)
         if isal_zlib:
-            compress = isal_zlib.compress
-            crc32 = isal_zlib.crc32
+            self._compress = isal_zlib.compress
+            self._crc32 = isal_zlib.crc32
         else:
-            compress = _zlib_compress
-            crc32 = zlib.crc32  # type: ignore
+            self._compress = _zlib_compress
+            self._crc32 = zlib.crc32  # type: ignore
         default_compresslevel = 1
-        self._compress = compress
-        self._crc32 = crc32
         self.compresslevel = (compresslevel if compresslevel is not None
                               else default_compresslevel)
 
