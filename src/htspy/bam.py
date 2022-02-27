@@ -82,9 +82,25 @@ class ContigIndex(typing.NamedTuple):
         return cls(binning_indices, linear_indices)
 
 
-class BamIndex:
+class BamIndex(typing.NamedTuple):
     contig_indices: List[ContigIndex]
     number_of_unplaced_unmapped_reads: Optional[int] = None
+
+    @classmethod
+    def from_file(cls, filepath):
+        with open(filepath, "rb") as file:
+            magic = file.read(4)
+            if magic != b"BAI\1":
+                raise BAMFormatError(f"{filepath} is not a valid BAM index")
+            n_ref, = struct.unpack("<I", file.read(4))
+            contig_indices = [ContigIndex.from_fileobj(file)
+                              for _ in range(n_ref)]
+            n_no_coor_bytes = file.read(8)
+            if n_no_coor_bytes:
+                number_of_unplaced_unmapped_reads, = struct.unpack(
+                    "<Q", n_no_coor_bytes)
+                return cls(contig_indices, number_of_unplaced_unmapped_reads)
+            return cls(contig_indices)
 
 
 class BamHeader:
