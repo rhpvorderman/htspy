@@ -41,32 +41,45 @@ class BamReference(typing.NamedTuple):
         return nlen + self.name.encode('ascii', 'strict') + seq_len
 
 
-class ContigIndex:
+class ContigIndex(typing.NamedTuple):
     binning_indices: Dict[int,
                           List[Tuple[VirtualFileOffset, VirtualFileOffset]]]
-    linear_indices: Dict[int, VirtualFileOffset]
+    linear_indices: List[VirtualFileOffset]
     reference_begin: Optional[VirtualFileOffset] = None
     reference_end: Optional[VirtualFileOffset] = None
     number_of_mapped_reads: Optional[int] = None
-    number_of_placed_unmapped_reads: Optional[int] = None
+    number_of_unmapped_reads: Optional[int] = None
 
     @classmethod
     def from_fileobj(cls, fileobj: BinaryIO):
-        binning_indices = {}
-        linear_indices = {}
+        binning_indices: Dict[
+            int, List[Tuple[VirtualFileOffset, VirtualFileOffset]]] = {}
+        linear_indices = []
         n_bin, = struct.unpack("<I", fileobj.read(4))
         for i in range(n_bin):
             bin, n_chunk = struct.unpack("<II", fileobj.read(8))
             chunk_list = []
             for j in range(n_chunk):
-                chunk_beg, chunk_end = struct.unpack("<QQ", fileobj.read(16))
                 chunk_list.append(
-                    (VirtualFileOffset.from_bytes(chunk_beg),
-                     VirtualFileOffset.from_bytes(chunk_end))
+                    (VirtualFileOffset.from_bytes(fileobj.read(8)),
+                     VirtualFileOffset.from_bytes(fileobj.read(8)))
                 )
             binning_indices[bin] = chunk_list
-        n_intv = struct.unpack("<II", fileobj.read(4))
-        # TODO: Continue
+        n_intv, = struct.unpack("<I", fileobj.read(4))
+        for i in range(n_intv):
+            linear_indices.append(
+                VirtualFileOffset.from_bytes(fileobj.read(8)))
+        pseudo_bins = binning_indices.get(37450)
+        if pseudo_bins:
+            assert len(pseudo_bins) == 2
+            reference_begin, reference_end = pseudo_bins[0]
+            nmapped_voffset, nunmapped_voffset = pseudo_bins[1]
+            number_of_mapped_reads = nmapped_voffset.to_integer()
+            number_of_unmapped_reads = nunmapped_voffset.to_integer()
+            return cls(binning_indices, linear_indices, reference_begin,
+                       reference_end, number_of_mapped_reads,
+                       number_of_unmapped_reads)
+        return cls(binning_indices, linear_indices)
 
 
 class BamIndex:

@@ -54,6 +54,11 @@ class VirtualFileOffset(typing.NamedTuple):
         uoffset = virtual_offset & 0xffff
         return cls(coffset, uoffset)
 
+    def to_integer(self):
+        virtual_offset = self.coffset << 16
+        virtual_offset &= self.uoffset
+        return virtual_offset
+
 
 def decompress_bgzf_blocks(file: io.BufferedReader) -> Iterator[bytes]:
     if isal_zlib:
