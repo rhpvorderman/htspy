@@ -148,6 +148,14 @@ class BGZFReader:
 
     def read_block(self):
         """Read the BGZF file up to the next block boundary"""
+        if self._buffer_size:
+            # There is some data in the buffer. Read it all and reset the buffer.
+            block = self._buffer.read()
+            self._buffer = io.BytesIO()
+            self._buffer_size = 0
+            if block:
+                return block
+
         header = self._file.read(18)
         if not header:
             if self._last_block_eof:
@@ -200,35 +208,22 @@ class BGZFReader:
         self._last_block_eof = bool(decompressed_block)
         return decompressed_block
 
-    def __iter__(self):
-        return self._block_iter
-
-    def readall(self) -> bytes:
-        current_pos = self._buffer.tell()
-        self._buffer.seek(self._buffer_size)  # move to end of buffer
-        for block in self._block_iter:
-            self._buffer.write(block)
-        self._buffer.seek(current_pos)
-        return self._buffer.read()
-
     def read(self, size=-1) -> bytes:
         if size == -1:
             return self.readall()
         current_pos = self._buffer.tell()
         if current_pos == self._buffer_size:
             # End of current buffer reached, read new block
-            try:
-                block = next(self._block_iter)
-            except StopIteration:
+            block = self.read_block()
+            if not block:
                 return b""
             self._buffer = io.BytesIO(block)
             self._buffer_size = len(block)
             current_pos = 0
 
         while size > (self._buffer_size - current_pos):
-            try:
-                block = next(self._block_iter)
-            except StopIteration:
+            block = self.read_block()
+            if not block:
                 break
             self._buffer.seek(self._buffer_size)
             self._buffer.write(block)
@@ -236,15 +231,15 @@ class BGZFReader:
         self._buffer.seek(current_pos)
         return self._buffer.read(size)
 
-    def read_until_next_block(self) -> bytes:
-        """Read the BGZF file until the next BGZF block boundary."""
-        if self._buffer.tell() == self._buffer_size:
-            # Already at a block boundary, return next block
-            try:
-                return next(self._block_iter)
-            except StopIteration:
-                return b""
-        # Otherwise, read the rest of the block in the buffer.
+    def readall(self) -> bytes:
+        current_pos = self._buffer.tell()
+        self._buffer.seek(self._buffer_size)  # move to end of buffer
+        while True:
+            block = self.read_block()
+            if not block:
+                break
+            self._buffer.write(block)
+        self._buffer.seek(current_pos)
         return self._buffer.read()
 
 
