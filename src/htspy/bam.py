@@ -221,7 +221,6 @@ class BamReader:
         self.header = BamHeader(sam_header.decode('ascii'), references)
 
     def __iter__(self) -> Iterator[BamRecord]:
-        yield from bam_iterator(self._file.read_until_next_block())
         for block in iter(self._file):
             yield from bam_iterator(block)
 
