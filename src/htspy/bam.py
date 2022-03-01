@@ -18,6 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 import io
+import os
 import struct
 import typing
 from typing import BinaryIO, Dict, Iterator, List, Optional, Tuple
@@ -192,8 +193,15 @@ class BamHeader:
 
 
 class BamReader:
-    def __init__(self, filename: str):
+    def __init__(self, filename: str, index_file: Optional[str] = None):
         self._file = BGZFReader(filename)
+        if index_file is not None:
+            self.index_file = index_file
+        elif os.path.exists(filename + ".bai"):
+            self.index_file = filename + ".bai"
+        else:
+            self.index_file = None
+        self.index = None
         self.header: BamHeader
         self._read_header()
 
