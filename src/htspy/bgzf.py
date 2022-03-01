@@ -73,6 +73,15 @@ class BGZFReader:
         else:
             self._decompress = zlib.decompress  # type: ignore
             self._crc32 = zlib.crc32  # type: ignore
+        if self._file.seekable():
+            current_pos = self._file.tell()
+            self._file.seek(-len(BGZF_EOF_BLOCK), io.SEEK_END)
+            if self._file.read(len(BGZF_EOF_BLOCK)) != BGZF_EOF_BLOCK:
+                raise EOFError("Truncated BGZF file. No EOF block found.")
+            self._eof_checked = True
+            self._file.seek(current_pos)
+        else:
+            self._eof_checked = False
         self._last_block_eof = False
 
     def close(self):
@@ -97,7 +106,12 @@ class BGZFReader:
 
         header = self._file.read(18)
         if not header:
-            if self._last_block_eof:
+            # If self._file is not seekable (such as stdin) we arrive here by
+            # iterating over all blocks. The last block should have been EOF.
+            # If self._file is seekable we may arrive here by seeking. In which
+            # case the last block may not have been EOF, so we fall back on the
+            # check in __init__.
+            if self._last_block_eof or self._eof_checked:
                 return b""
             else:
                 raise EOFError("Truncated BGZF file. No EOF block found.")
