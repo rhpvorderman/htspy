@@ -227,9 +227,7 @@ class BGZFWriter:
         self._file.close()
 
     def write_eof_block(self):
-        self._file.write(b"\x1f\x8b\x08\x04\x00\x00\x00\x00\x00\xff\x06\x00"
-                         b"\x42\x43\x02\x00\x1b\x00\x03\x00\x00\x00\x00\x00"
-                         b"\x00\x00\x00\x00")
+        self._file.write(BGZF_EOF_BLOCK)
 
     def __enter__(self):
         return self
