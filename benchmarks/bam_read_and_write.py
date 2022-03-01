@@ -8,4 +8,3 @@ if __name__ == "__main__":
                        bam_reader.header) as bam_writer:
             for record in bam_reader:
                 bam_writer.write(record)
-"<"
