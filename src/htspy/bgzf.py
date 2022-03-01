@@ -36,7 +36,9 @@ BGZF_MAX_BLOCK_SIZE = 0x10000  # 64K, 65536. Same as bgzf.h
 BGZF_BLOCK_SIZE = 0xff00  # 65280. Same as bgzf.h
 
 # XFL not set
-BGZF_BASE_HEADER = b"\x1f\x8b\x08\x04\x00\x00\x00\x00\x00\xff\x06\x00\x42\x43\x02\x00"  # noqa: E501
+BGZF_BASE_HEADER = b"\x1f\x8b\x08\x04\x00\x00\x00\x00\x00\xff\x06\x00\x42\x43\x02\x00"
+BGZF_EOF_BLOCK = b"\x1f\x8b\x08\x04\x00\x00\x00\x00\x00\xff\x06\x00\x42\x43" \
+                 b"\x02\x00\x1b\x00\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00"
 
 
 class BGZFError(IOError):
@@ -69,7 +71,7 @@ class BGZFReader:
             self._decompress = isal_zlib.decompress
             self._crc32 = isal_zlib.crc32
         else:
-            self._decompress = zlib.decompress
+            self._decompress = zlib.decompress  # type: ignore
             self._crc32 = zlib.crc32  # type: ignore
         self._last_block_eof = False
 
@@ -100,7 +102,7 @@ class BGZFReader:
             else:
                 raise EOFError("Truncated BGZF file. No EOF block found.")
         if len(header) < 18:
-            raise EOFError(f"Truncated bgzf block.")
+            raise EOFError("Truncated bgzf block.")
         magic, method, flags, mtime, xfl, os, xlen, si1, si2, slen, bsize = \
             struct.unpack("<HBBIBBHBBHH", header)
         if magic != GZIP_MAGIC_INT:
@@ -108,11 +110,11 @@ class BGZFReader:
         if method != 8:  # Deflate method
             raise BGZFError(f"Unsupported compression method: {method}")
         if not flags & 4:
-            raise BGZFError(f"Gzip block should contain an extra field.")
+            raise BGZFError("Gzip block should contain an extra field.")
         if xlen < 6:
-            raise BGZFError(f"XLEN too small")
+            raise BGZFError("XLEN too small")
         if not (si1 == 66 and si2 == 67 and slen == 2):
-            raise BGZFError(f"Invalid BSIZE fields")
+            raise BGZFError("Invalid BSIZE fields")
         # Skip other xtra fields.
         self._file.read(xlen - 6)
         block_size = bsize - xlen - 19
@@ -120,12 +122,12 @@ class BGZFReader:
         if block_peek[0] == 1:  # No compression.
             length, inverse_length = struct.unpack("<xHH", self._file.read(5))
             if length != ~inverse_length & 0xFFFF or length != block_size - 5:
-                raise BGZFError(f"Corrupted uncompressed block.")
+                raise BGZFError("Corrupted uncompressed block.")
             decompressed_block = self._file.read(length)
         else:
             block = self._file.read(block_size)
             if len(block) < block_size:
-                raise EOFError(f"Truncated block.")
+                raise EOFError("Truncated block.")
             # Decompress block, use the 64K as initial buffer size to avoid
             # resizing of the buffer. (Max block size before compressing is
             # slightly less than 64K for BGZF blocks). 64K is allocated faster
@@ -135,7 +137,7 @@ class BGZFReader:
                                                   bufsize=65536)
         trailer = self._file.read(8)
         if len(trailer) < 8:
-            raise EOFError(f"Truncated block.")
+            raise EOFError("Truncated block.")
         crc, isize = struct.unpack("<II", trailer)
         if crc != self._crc32(decompressed_block):
             raise BGZFError("Checksum fail of decompressed block")
@@ -150,7 +152,7 @@ class BGZFReader:
         self._last_block_eof = False
         return decompressed_block
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[bytes]:
         while True:
             block = self.read_block()
             if not block:
