@@ -64,7 +64,7 @@ class BGZFReader:
     def __init__(self, filename: str):
         self._file = open(filename, 'rb')
         self._buffer = io.BytesIO()
-        self._buffer_size = 0
+        self._bytes_in_buffer = 0
         if isal_zlib:
             self._decompress = isal_zlib.decompress
             self._crc32 = isal_zlib.crc32
@@ -85,11 +85,11 @@ class BGZFReader:
 
     def read_block(self):
         """Read the BGZF file up to the next block boundary"""
-        if self._buffer_size:
+        if self._bytes_in_buffer:
             # There is some data in the buffer. Read it all and reset the buffer.
             block = self._buffer.read()
             self._buffer = io.BytesIO()
-            self._buffer_size = 0
+            self._bytes_in_buffer = 0
             if block:
                 return block
 
@@ -161,28 +161,32 @@ class BGZFReader:
         if size == -1:
             return self.readall()
         current_pos = self._buffer.tell()
-        if current_pos == self._buffer_size:
+        if current_pos == self._bytes_in_buffer:
             # End of current buffer reached, read new block
             block = self.read_block()
             if not block:
                 return b""
             self._buffer = io.BytesIO(block)
-            self._buffer_size = len(block)
+            self._bytes_in_buffer = len(block)
             current_pos = 0
 
-        while size > (self._buffer_size - current_pos):
+        buffer_size = self._bytes_in_buffer
+        while size > (buffer_size - current_pos):
+            # Set bytes in buffer to 0. Otherwise read_block will return the
+            # current buffer.
+            self._bytes_in_buffer = 0
             block = self.read_block()
             if not block:
                 break
-            self._buffer.seek(self._buffer_size)
-            self._buffer.write(block)
-            self._buffer_size += len(block)
+            self._buffer.seek(buffer_size)
+            buffer_size += self._buffer.write(block)
+        self._bytes_in_buffer = buffer_size
         self._buffer.seek(current_pos)
         return self._buffer.read(size)
 
     def readall(self) -> bytes:
         current_pos = self._buffer.tell()
-        self._buffer.seek(self._buffer_size)  # move to end of buffer
+        self._buffer.seek(self._bytes_in_buffer)  # move to end of buffer
         while True:
             block = self.read_block()
             if not block:
