@@ -25,8 +25,8 @@ from typing import BinaryIO, Dict, Iterator, List, Optional, Tuple
 
 from ._bam import BamBlockBuffer as _BamBlockBuffer
 from ._bam import BamRecord, bam_iterator
+from ._bgzf import vfo_chunk_list_from_bytes, vfo_list_from_bytes
 from .bgzf import BGZFReader, BGZFWriter, BGZF_BLOCK_SIZE, VirtualFileOffset
-from ._bgzf import vfo_list_from_bytes, vfo_chunk_list_from_bytes
 
 
 class BAMFormatError(Exception):
@@ -190,12 +190,11 @@ class BamReader:
     def __init__(self, filename: str, index_file: Optional[str] = None):
         self._file = BGZFReader(filename)
         if index_file is not None:
-            self.index_file = index_file
+            self.index: Optional[BamIndex] = BamIndex.from_file(index_file)
         elif os.path.exists(filename + ".bai"):
-            self.index_file = filename + ".bai"
+            self.index = BamIndex.from_file(filename + ".bai")
         else:
-            self.index_file = None
-        self.index = None
+            self.index = None
         self.header: BamHeader
         self._read_header()
 
