@@ -35,15 +35,6 @@ VirtualFileOffset_dealloc(VirtualFileOffset * self){
     Py_TYPE(self)->tp_free(self);
 }
 
-static PyTypeObject VirtualFileOffset_Type; // Forward declaration
-
-static PyObject * VirtualFileOffset_FromUint64(uint64_t i) {
-    VirtualFileOffset * vfo = PyObject_NEW(VirtualFileOffset, 
-                                           &VirtualFileOffset_Type);
-    vfo->voffset = i;
-    return (PyObject *)vfo;
-}
-
 static int 
 VirtualFileOffset__init__(VirtualFileOffset * self, PyObject *args, 
                           PyObject *kwargs) {
@@ -102,4 +93,79 @@ static PyGetSetDef VirtualFileOffset_properties[] = {
     {"_voffset", VirtualFileOffset__voffset_get, NULL, 
      "The internal virtual file offset integer.", NULL},
     {NULL}
+};
+
+// METHODS
+PyDoc_STRVAR(VirtualFileOffset_from_bytes_doc,
+"Create a VirtualFileOffset from a bytes object");
+
+#define VIRTUAL_FILEOFFSET_FROM_BYTES_METHODDEF    \
+    {"from_bytes", (PyCFunction)(void(*)(void))VirtualFileOffset_from_bytes, \
+     METH_O | METH_CLASS, VirtualFileOffset_from_bytes_doc}
+
+static PyObject * 
+VirtualFileOffset_from_bytes(PyTypeObject *cls, PyObject* b) {
+    if (!PyBytes_CheckExact(b)) {
+        PyErr_Format(PyExc_TypeError, "Expected bytes, got %s", 
+                     Py_TYPE(b)->tp_name);
+        return NULL;
+    }
+    if (!PyBytes_GET_SIZE(b) == sizeof(uint64_t)) {
+        PyErr_Format(PyExc_ValueError, "b must have a length of exactly %d", 
+                     sizeof(uint64_t));
+    }
+    VirtualFileOffset *vfs = PyObject_NEW(VirtualFileOffset, cls);
+    vfs->voffset = *(uint64_t *)(PyBytes_AS_STRING(b));
+    return (PyObject *)vfs;
+}
+
+static PyMethodDef VirtualFileOffset_methods[] = {
+     VIRTUAL_FILEOFFSET_FROM_BYTES_METHODDEF,
+    {NULL}
+};
+
+static PyTypeObject VirtualFileOffset_Type = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_name = "_bgzf.VirtualFileOffset",
+    .tp_basicsize = sizeof(VirtualFileOffset),
+    .tp_dealloc = (destructor)VirtualFileOffset_dealloc,
+    .tp_flags = Py_TPFLAGS_DEFAULT,
+    .tp_methods = VirtualFileOffset_methods,
+    .tp_getset = VirtualFileOffset_properties,
+    .tp_init = (initproc)VirtualFileOffset__init__,
+    .tp_new = PyType_GenericNew,
+};
+
+static PyObject * VirtualFileOffset_FromUint64(uint64_t i) {
+    VirtualFileOffset * vfo = PyObject_NEW(VirtualFileOffset, 
+                                           &VirtualFileOffset_Type);
+    vfo->voffset = i;
+    return (PyObject *)vfo;
+}
+
+static struct PyModuleDef _bgzf_module = {
+    PyModuleDef_HEAD_INIT,
+    "_bgzf",
+    NULL,
+    -1, 
+    NULL
+};
+
+PyMODINIT_FUNC
+PyInit__bgzf(void){
+    PyObject *m;
+    m = PyModule_Create(&_bgzf_module);
+    if (m == NULL){
+        return NULL;
+    }
+
+    if (PyType_Ready(&VirtualFileOffset_Type) < 0) {
+        return NULL;
+    }
+    PyObject * VirtualFileOffsetType = (PyObject *)&VirtualFileOffset_Type;
+    Py_INCREF(VirtualFileOffsetType);
+    if (PyModule_AddObject(m, "VirtualFileOffset", VirtualFileOffsetType) < 0){
+        return NULL;
+    }
+    return m;
 }
