@@ -75,8 +75,8 @@ class ContigIndex(typing.NamedTuple):
             assert len(pseudo_bins) == 2
             reference_begin, reference_end = pseudo_bins[0]
             nmapped_voffset, nunmapped_voffset = pseudo_bins[1]
-            number_of_mapped_reads = nmapped_voffset.to_integer()
-            number_of_unmapped_reads = nunmapped_voffset.to_integer()
+            number_of_mapped_reads = nmapped_voffset._voffset
+            number_of_unmapped_reads = nunmapped_voffset._voffset
             return cls(binning_indices, linear_indices, reference_begin,
                        reference_end, number_of_mapped_reads,
                        number_of_unmapped_reads)
