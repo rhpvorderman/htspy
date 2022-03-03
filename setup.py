@@ -58,6 +58,7 @@ setup(
         'python_implementation != "PyPy"': ['isal>=0.9.0'],
     },
     ext_modules=[
-        Extension("htspy._bam", ["src/htspy/_bammodule.c"])
+        Extension("htspy._bam", ["src/htspy/_bammodule.c"]),
+        Extension("htspy._bgzf", ["src/htspy/_bgzfmodule.c"])
     ],
 )
