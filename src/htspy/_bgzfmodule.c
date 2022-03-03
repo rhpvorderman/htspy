@@ -35,6 +35,15 @@ VirtualFileOffset_dealloc(VirtualFileOffset * self){
     Py_TYPE(self)->tp_free(self);
 }
 
+static PyTypeObject VirtualFileOffset_Type; // Forward declaration
+
+static PyObject * VirtualFileOffset_FromUint64(uint64_t i) {
+    VirtualFileOffset * vfo = PyObject_NEW(VirtualFileOffset, 
+                                           &VirtualFileOffset_Type);
+    vfo->voffset = i;
+    return (PyObject *)vfo;
+}
+
 static int 
 VirtualFileOffset__init__(VirtualFileOffset * self, PyObject *args, 
                           PyObject *kwargs) {
@@ -70,3 +79,27 @@ VirtualFileOffset__init__(VirtualFileOffset * self, PyObject *args,
     return 0;
 }
 
+static PyObject * 
+VirtualFileOffset_coffset_get(VirtualFileOffset *self, void *closure) {
+    return PyLong_FromUnsignedLongLong(self->voffset >> 16);
+}
+
+static PyObject * 
+VirtualFileOffset_uoffset_get(VirtualFileOffset * self, void *closure) {
+    return PyLong_FromUnsignedLongLong(self->voffset & UOFFSET_MAX);
+}
+
+static PyObject *
+VirtualFileOffset__voffset_get(VirtualFileOffset *self, void *closure) {
+    return PyLong_FromUnsignedLongLong(self->voffset);
+}
+
+static PyGetSetDef VirtualFileOffset_properties[] = {
+    {"coffset", VirtualFileOffset_coffset_get, NULL, 
+     "Offset to the beginning of a BGZF block", NULL},
+    {"uoffset", VirtualFileOffset_uoffset_get, NULL, 
+     "Offset inside the BGZF block.", NULL},
+    {"_voffset", VirtualFileOffset__voffset_get, NULL, 
+     "The internal virtual file offset integer.", NULL},
+    {NULL}
+}
