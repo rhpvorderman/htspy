@@ -18,6 +18,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+from typing import List
+
 class VirtualFileOffset:
     def __init__(self, coffset: int, uoffset: int): ...
 
@@ -30,3 +32,5 @@ class VirtualFileOffset:
 
     @classmethod
     def from_bytes(cls, b: bytes) -> VirtualFileOffset: ...
+
+def vfo_list_from_bytes(data: bytes) -> List[VirtualFileOffset]: ...

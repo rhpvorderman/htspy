@@ -143,12 +143,56 @@ static PyObject * VirtualFileOffset_FromUint64(uint64_t i) {
     return (PyObject *)vfo;
 }
 
+PyDoc_STRVAR(vfo_list_from_bytes_doc,
+"vfo_list_from_bytes($module, data, /)\n"
+"--\n"
+"\n"
+"Creates a list of VirtualFileOffset objects from a bytes object.\n"
+"\n"
+"  data\n"
+"    A bytes object that contains virtual file offset integers\n"
+);
+
+static PyObject * 
+vfo_list_from_bytes(PyObject *module, PyObject *data) {
+    if (!PyBytes_CheckExact(data)) {
+        PyErr_Format(
+            PyExc_TypeError, "data must be a bytes object, got %s", 
+            Py_TYPE(data)->tp_name);
+        return NULL;
+    }
+    Py_ssize_t size = PyBytes_GET_SIZE(data);
+    if (size % sizeof(uint64_t)) {
+        PyErr_Format(
+            PyExc_ValueError, 
+            "data must have a length that is a multiple of %ld, got %ld", 
+            sizeof(uint64_t), size
+        );
+        return NULL;
+    }
+    Py_ssize_t n = size / sizeof(uint64_t);
+    uint64_t * vfo = (uint64_t *)PyBytes_AS_STRING(data);
+    PyObject * vfo_list = PyList_New(n);
+    Py_ssize_t i = 0;
+    while (i < n) {
+        PyList_SET_ITEM(vfo_list, i, VirtualFileOffset_FromUint64(vfo[i]));
+        i += 1;
+    }
+    return vfo_list;
+}
+
+static PyMethodDef _bgzf_methods[] = {
+    {"vfo_list_from_bytes", (PyCFunction)(void(*)(void))vfo_list_from_bytes,
+    METH_O, vfo_list_from_bytes_doc},
+    {NULL}
+};
+
 static struct PyModuleDef _bgzf_module = {
     PyModuleDef_HEAD_INIT,
     "_bgzf",
     NULL,
     -1, 
-    NULL
+    _bgzf_methods
 };
 
 PyMODINIT_FUNC
