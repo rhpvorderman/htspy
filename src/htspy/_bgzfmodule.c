@@ -181,6 +181,18 @@ vfo_list_from_bytes(PyObject *module, PyObject *data) {
     return vfo_list;
 }
 
+PyDoc_STRVAR(bin_index_from_bytes_doc,
+"bin_index_from_bytes($module, data, number_of_bins /)\n"
+"--\n"
+"\n"
+"Creates a list of VirtualFileOffset objects from a bytes object.\n"
+"\n"
+"  data\n"
+"    A bytes object that contains virtual file offset integers\n"
+"  n_bin\n"
+"    The number of bins\n"
+);
+
 static PyMethodDef _bgzf_methods[] = {
     {"vfo_list_from_bytes", (PyCFunction)(void(*)(void))vfo_list_from_bytes,
     METH_O, vfo_list_from_bytes_doc},
