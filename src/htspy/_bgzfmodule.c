@@ -86,11 +86,11 @@ VirtualFileOffset__voffset_get(VirtualFileOffset *self, void *closure) {
 }
 
 static PyGetSetDef VirtualFileOffset_properties[] = {
-    {"coffset", VirtualFileOffset_coffset_get, NULL, 
+    {"coffset", (getter)VirtualFileOffset_coffset_get, NULL,
      "Offset to the beginning of a BGZF block", NULL},
-    {"uoffset", VirtualFileOffset_uoffset_get, NULL, 
+    {"uoffset", (getter)VirtualFileOffset_uoffset_get, NULL,
      "Offset inside the BGZF block.", NULL},
-    {"_voffset", VirtualFileOffset__voffset_get, NULL, 
+    {"_voffset", (getter)VirtualFileOffset__voffset_get, NULL,
      "The internal virtual file offset integer.", NULL},
     {NULL}
 };
@@ -110,7 +110,7 @@ VirtualFileOffset_from_bytes(PyTypeObject *cls, PyObject* b) {
                      Py_TYPE(b)->tp_name);
         return NULL;
     }
-    if (!PyBytes_GET_SIZE(b) == sizeof(uint64_t)) {
+    if (!(PyBytes_GET_SIZE(b) == sizeof(uint64_t))) {
         PyErr_Format(PyExc_ValueError, "b must have a length of exactly %d", 
                      sizeof(uint64_t));
     }

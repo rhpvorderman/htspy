@@ -20,9 +20,10 @@
 
 import io
 import struct
-import typing
 import zlib
 from typing import Iterator, Optional
+
+from ._bgzf import VirtualFileOffset
 
 try:
     from isal import isal_zlib
@@ -43,23 +44,6 @@ BGZF_EOF_BLOCK = b"\x1f\x8b\x08\x04\x00\x00\x00\x00\x00\xff\x06\x00\x42\x43" \
 
 class BGZFError(IOError):
     pass
-
-
-class VirtualFileOffset(typing.NamedTuple):
-    coffset: int
-    uoffset: int
-
-    @classmethod
-    def from_bytes(cls, b: bytes):
-        virtual_offset, = struct.unpack("<Q", b)
-        coffset = virtual_offset >> 16
-        uoffset = virtual_offset & 0xffff
-        return cls(coffset, uoffset)
-
-    def to_integer(self):
-        virtual_offset = self.coffset << 16
-        virtual_offset &= self.uoffset
-        return virtual_offset
 
 
 class BGZFReader:
