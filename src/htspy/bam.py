@@ -26,7 +26,8 @@ from typing import BinaryIO, Dict, Iterator, List, Optional, Tuple
 from ._bam import BamBlockBuffer as _BamBlockBuffer
 from ._bam import BamRecord, bam_iterator
 from .bgzf import BGZFReader, BGZFWriter, BGZF_BLOCK_SIZE, VirtualFileOffset
-from ._bgzf import vfo_list_from_bytes
+from ._bgzf import vfo_list_from_bytes, vfo_chunk_list_from_bytes
+
 
 class BAMFormatError(Exception):
     pass
@@ -59,13 +60,8 @@ class ContigIndex(typing.NamedTuple):
         n_bin, = struct.unpack("<I", fileobj.read(4))
         for i in range(n_bin):
             bin, n_chunk = struct.unpack("<II", fileobj.read(8))
-            chunk_list = []
-            for j in range(n_chunk):
-                chunk_list.append(
-                    (VirtualFileOffset.from_bytes(fileobj.read(8)),
-                     VirtualFileOffset.from_bytes(fileobj.read(8)))
-                )
-            binning_indices[bin] = chunk_list
+            binning_indices[bin] = vfo_chunk_list_from_bytes(
+                fileobj.read(16 * n_chunk))
         n_intv, = struct.unpack("<I", fileobj.read(4))
         linear_indices = vfo_list_from_bytes(fileobj.read(n_intv * 8))
         pseudo_bins = binning_indices.get(37450)

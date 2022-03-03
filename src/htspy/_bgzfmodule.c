@@ -181,21 +181,59 @@ vfo_list_from_bytes(PyObject *module, PyObject *data) {
     return vfo_list;
 }
 
-PyDoc_STRVAR(bin_index_from_bytes_doc,
-"bin_index_from_bytes($module, data, number_of_bins /)\n"
+PyDoc_STRVAR(vfo_chunk_list_from_bytes_doc,
+"vfo_list_from_bytes($module, data, /)\n"
 "--\n"
 "\n"
-"Creates a list of VirtualFileOffset objects from a bytes object.\n"
+"Creates a list of paired VirtualFileOffset tuples (start, end)\n"
+"from a bytes object.\n"
 "\n"
 "  data\n"
 "    A bytes object that contains virtual file offset integers\n"
-"  n_bin\n"
-"    The number of bins\n"
 );
+
+static PyObject * 
+vfo_chunk_list_from_bytes(PyObject *module, PyObject *data) {
+    if (!PyBytes_CheckExact(data)) {
+        PyErr_Format(
+            PyExc_TypeError, "data must be a bytes object, got %s", 
+            Py_TYPE(data)->tp_name);
+        return NULL;
+    }
+    Py_ssize_t item_size = 2 * sizeof(uint64_t);
+    Py_ssize_t size = PyBytes_GET_SIZE(data);
+    if (size % item_size) {
+        PyErr_Format(
+            PyExc_ValueError, 
+            "data must have a length that is a multiple of %ld, got %ld", 
+            item_size, size
+        );
+        return NULL;
+    }
+    Py_ssize_t n = size / item_size;
+    uint64_t * vfo = (uint64_t *)PyBytes_AS_STRING(data);
+    PyObject * vfo_chunk_list = PyList_New(n);
+    Py_ssize_t i = 0;
+    PyObject * chunk;
+    PyObject * start;
+    PyObject * end;
+    while (i < n) {
+        start = VirtualFileOffset_FromUint64(*vfo);
+        vfo += 1;
+        end = VirtualFileOffset_FromUint64(*vfo);
+        vfo += 1;
+        chunk = PyTuple_Pack(2, start, end);
+        PyList_SET_ITEM(vfo_chunk_list, i, chunk);
+        i += 1;
+    }
+    return vfo_chunk_list;
+}
 
 static PyMethodDef _bgzf_methods[] = {
     {"vfo_list_from_bytes", (PyCFunction)(void(*)(void))vfo_list_from_bytes,
     METH_O, vfo_list_from_bytes_doc},
+    {"vfo_chunk_list_from_bytes", (PyCFunction)(void(*)(void))vfo_chunk_list_from_bytes,
+    METH_O, vfo_chunk_list_from_bytes_doc},
     {NULL}
 };
 

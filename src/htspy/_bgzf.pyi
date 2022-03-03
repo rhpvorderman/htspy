@@ -18,7 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from typing import List
+from typing import List, Tuple
 
 class VirtualFileOffset:
     def __init__(self, coffset: int, uoffset: int): ...
@@ -34,3 +34,5 @@ class VirtualFileOffset:
     def from_bytes(cls, b: bytes) -> VirtualFileOffset: ...
 
 def vfo_list_from_bytes(data: bytes) -> List[VirtualFileOffset]: ...
+def vfo_chunk_list_from_bytes(
+        data: bytes) -> List[Tuple[VirtualFileOffset, VirtualFileOffset]]: ...
