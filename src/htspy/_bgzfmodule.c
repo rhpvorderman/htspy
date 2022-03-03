@@ -95,6 +95,14 @@ static PyGetSetDef VirtualFileOffset_properties[] = {
     {NULL}
 };
 
+static PyObject *
+VirtualFileOffset__repr__(VirtualFileOffset * self) {
+    return PyUnicode_FromFormat(
+        "VirtualFileOffset(%ld, %ld)", 
+        self->voffset >> 16, self->voffset & UOFFSET_MAX
+    );
+}
+
 // METHODS
 PyDoc_STRVAR(VirtualFileOffset_from_bytes_doc,
 "Create a VirtualFileOffset from a bytes object");
@@ -134,6 +142,7 @@ static PyTypeObject VirtualFileOffset_Type = {
     .tp_getset = VirtualFileOffset_properties,
     .tp_init = (initproc)VirtualFileOffset__init__,
     .tp_new = PyType_GenericNew,
+    .tp_repr = (reprfunc)VirtualFileOffset__repr__,
 };
 
 static PyObject * VirtualFileOffset_FromUint64(uint64_t i) {
