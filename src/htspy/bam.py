@@ -56,7 +56,6 @@ class ContigIndex(typing.NamedTuple):
     def from_fileobj(cls, fileobj: BinaryIO):
         binning_indices: Dict[
             int, List[Tuple[VirtualFileOffset, VirtualFileOffset]]] = {}
-        linear_indices = []
         n_bin, = struct.unpack("<I", fileobj.read(4))
         for i in range(n_bin):
             bin, n_chunk = struct.unpack("<II", fileobj.read(8))
