@@ -44,9 +44,9 @@ class BamReference(typing.NamedTuple):
 
 
 class ContigIndex(typing.NamedTuple):
-    binning_indices: Dict[int,
-                          Tuple[Tuple[VirtualFileOffset, VirtualFileOffset], ...]]
-    linear_indices: Tuple[VirtualFileOffset, ...]
+    bin_index: Dict[
+        int, Tuple[Tuple[VirtualFileOffset, VirtualFileOffset], ...]]
+    linear_index: Tuple[VirtualFileOffset, ...]
     reference_begin: Optional[VirtualFileOffset] = None
     reference_end: Optional[VirtualFileOffset] = None
     number_of_mapped_reads: Optional[int] = None
@@ -54,26 +54,26 @@ class ContigIndex(typing.NamedTuple):
 
     @classmethod
     def from_fileobj(cls, fileobj: BinaryIO):
-        binning_indices: Dict[
+        bin_index: Dict[
             int, Tuple[Tuple[VirtualFileOffset, VirtualFileOffset]], ...] = {}
         n_bin, = struct.unpack("<I", fileobj.read(4))
         for i in range(n_bin):
             bin, n_chunk = struct.unpack("<II", fileobj.read(8))
-            binning_indices[bin] = vfo_chunk_tuple_from_bytes(
+            bin_index[bin] = vfo_chunk_tuple_from_bytes(
                 fileobj.read(16 * n_chunk))
         n_intv, = struct.unpack("<I", fileobj.read(4))
-        linear_indices = vfo_tuple_from_bytes(fileobj.read(n_intv * 8))
-        pseudo_bins = binning_indices.get(37450)
+        linear_index = vfo_tuple_from_bytes(fileobj.read(n_intv * 8))
+        pseudo_bins = bin_index.get(37450)
         if pseudo_bins:
             assert len(pseudo_bins) == 2
             reference_begin, reference_end = pseudo_bins[0]
             nmapped_voffset, nunmapped_voffset = pseudo_bins[1]
             number_of_mapped_reads = nmapped_voffset._voffset
             number_of_unmapped_reads = nunmapped_voffset._voffset
-            return cls(binning_indices, linear_indices, reference_begin,
+            return cls(bin_index, linear_index, reference_begin,
                        reference_end, number_of_mapped_reads,
                        number_of_unmapped_reads)
-        return cls(binning_indices, linear_indices)
+        return cls(bin_index, linear_index)
 
 
 class BamIndex(typing.NamedTuple):
