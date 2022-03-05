@@ -152,8 +152,8 @@ static PyObject * VirtualFileOffset_FromUint64(uint64_t i) {
     return (PyObject *)vfo;
 }
 
-PyDoc_STRVAR(vfo_list_from_bytes_doc,
-"vfo_list_from_bytes($module, data, /)\n"
+PyDoc_STRVAR(vfo_tuple_from_bytes_doc,
+"vfo_tuple_from_bytes($module, data, /)\n"
 "--\n"
 "\n"
 "Creates a list of VirtualFileOffset objects from a bytes object.\n"
@@ -163,7 +163,7 @@ PyDoc_STRVAR(vfo_list_from_bytes_doc,
 );
 
 static PyObject * 
-vfo_list_from_bytes(PyObject *module, PyObject *data) {
+vfo_tuple_from_bytes(PyObject *module, PyObject *data) {
     if (!PyBytes_CheckExact(data)) {
         PyErr_Format(
             PyExc_TypeError, "data must be a bytes object, got %s", 
@@ -181,17 +181,17 @@ vfo_list_from_bytes(PyObject *module, PyObject *data) {
     }
     Py_ssize_t n = size / sizeof(uint64_t);
     uint64_t * vfo = (uint64_t *)PyBytes_AS_STRING(data);
-    PyObject * vfo_list = PyList_New(n);
+    PyObject * vfo_tuple = PyTuple_New(n);
     Py_ssize_t i = 0;
     while (i < n) {
-        PyList_SET_ITEM(vfo_list, i, VirtualFileOffset_FromUint64(vfo[i]));
+        PyTuple_SET_ITEM(vfo_tuple, i, VirtualFileOffset_FromUint64(vfo[i]));
         i += 1;
     }
-    return vfo_list;
+    return vfo_tuple;
 }
 
-PyDoc_STRVAR(vfo_chunk_list_from_bytes_doc,
-"vfo_list_from_bytes($module, data, /)\n"
+PyDoc_STRVAR(vfo_chunk_tuple_from_bytes_doc,
+"vfo_tuple_from_bytes($module, data, /)\n"
 "--\n"
 "\n"
 "Creates a list of paired VirtualFileOffset tuples (start, end)\n"
@@ -202,7 +202,7 @@ PyDoc_STRVAR(vfo_chunk_list_from_bytes_doc,
 );
 
 static PyObject * 
-vfo_chunk_list_from_bytes(PyObject *module, PyObject *data) {
+vfo_chunk_tuple_from_bytes(PyObject *module, PyObject *data) {
     if (!PyBytes_CheckExact(data)) {
         PyErr_Format(
             PyExc_TypeError, "data must be a bytes object, got %s", 
@@ -221,7 +221,7 @@ vfo_chunk_list_from_bytes(PyObject *module, PyObject *data) {
     }
     Py_ssize_t n = size / item_size;
     uint64_t * vfo = (uint64_t *)PyBytes_AS_STRING(data);
-    PyObject * vfo_chunk_list = PyList_New(n);
+    PyObject * vfo_chunk_tuple = PyTuple_New(n);
     Py_ssize_t i = 0;
     PyObject * chunk;
     PyObject * start;
@@ -232,17 +232,17 @@ vfo_chunk_list_from_bytes(PyObject *module, PyObject *data) {
         end = VirtualFileOffset_FromUint64(*vfo);
         vfo += 1;
         chunk = PyTuple_Pack(2, start, end);
-        PyList_SET_ITEM(vfo_chunk_list, i, chunk);
+        PyTuple_SET_ITEM(vfo_chunk_tuple, i, chunk);
         i += 1;
     }
-    return vfo_chunk_list;
+    return vfo_chunk_tuple;
 }
 
 static PyMethodDef _bgzf_methods[] = {
-    {"vfo_list_from_bytes", (PyCFunction)(void(*)(void))vfo_list_from_bytes,
-    METH_O, vfo_list_from_bytes_doc},
-    {"vfo_chunk_list_from_bytes", (PyCFunction)(void(*)(void))vfo_chunk_list_from_bytes,
-    METH_O, vfo_chunk_list_from_bytes_doc},
+    {"vfo_tuple_from_bytes", (PyCFunction)(void(*)(void))vfo_tuple_from_bytes,
+    METH_O, vfo_tuple_from_bytes_doc},
+    {"vfo_chunk_tuple_from_bytes", (PyCFunction)(void(*)(void))vfo_chunk_tuple_from_bytes,
+    METH_O, vfo_chunk_tuple_from_bytes_doc},
     {NULL}
 };
 

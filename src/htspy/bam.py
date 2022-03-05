@@ -25,7 +25,7 @@ from typing import BinaryIO, Dict, Iterator, List, Optional, Tuple
 
 from ._bam import BamBlockBuffer as _BamBlockBuffer
 from ._bam import BamRecord, bam_iterator
-from ._bgzf import vfo_chunk_list_from_bytes, vfo_list_from_bytes
+from ._bgzf import vfo_chunk_tuple_from_bytes, vfo_tuple_from_bytes
 from .bgzf import BGZFReader, BGZFWriter, BGZF_BLOCK_SIZE, VirtualFileOffset
 
 
@@ -45,8 +45,8 @@ class BamReference(typing.NamedTuple):
 
 class ContigIndex(typing.NamedTuple):
     binning_indices: Dict[int,
-                          List[Tuple[VirtualFileOffset, VirtualFileOffset]]]
-    linear_indices: List[VirtualFileOffset]
+                          Tuple[Tuple[VirtualFileOffset, VirtualFileOffset], ...]]
+    linear_indices: Tuple[VirtualFileOffset, ...]
     reference_begin: Optional[VirtualFileOffset] = None
     reference_end: Optional[VirtualFileOffset] = None
     number_of_mapped_reads: Optional[int] = None
@@ -55,14 +55,14 @@ class ContigIndex(typing.NamedTuple):
     @classmethod
     def from_fileobj(cls, fileobj: BinaryIO):
         binning_indices: Dict[
-            int, List[Tuple[VirtualFileOffset, VirtualFileOffset]]] = {}
+            int, Tuple[Tuple[VirtualFileOffset, VirtualFileOffset]], ...] = {}
         n_bin, = struct.unpack("<I", fileobj.read(4))
         for i in range(n_bin):
             bin, n_chunk = struct.unpack("<II", fileobj.read(8))
-            binning_indices[bin] = vfo_chunk_list_from_bytes(
+            binning_indices[bin] = vfo_chunk_tuple_from_bytes(
                 fileobj.read(16 * n_chunk))
         n_intv, = struct.unpack("<I", fileobj.read(4))
-        linear_indices = vfo_list_from_bytes(fileobj.read(n_intv * 8))
+        linear_indices = vfo_tuple_from_bytes(fileobj.read(n_intv * 8))
         pseudo_bins = binning_indices.get(37450)
         if pseudo_bins:
             assert len(pseudo_bins) == 2
