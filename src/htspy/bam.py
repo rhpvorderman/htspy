@@ -25,7 +25,7 @@ from typing import BinaryIO, Dict, Iterator, List, Optional, Tuple
 
 from ._bam import BamBlockBuffer as _BamBlockBuffer
 from ._bam import BamRecord, bam_iterator
-from ._bgzf import vfo_chunk_tuple_from_bytes, vfo_tuple_from_bytes
+from ._indexing import vfo_chunk_tuple_from_bytes, vfo_tuple_from_bytes
 from .bgzf import BGZFReader, BGZFWriter, BGZF_BLOCK_SIZE, VirtualFileOffset
 
 

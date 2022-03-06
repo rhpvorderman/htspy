@@ -59,6 +59,6 @@ setup(
     },
     ext_modules=[
         Extension("htspy._bam", ["src/htspy/_bammodule.c"]),
-        Extension("htspy._bgzf", ["src/htspy/_bgzfmodule.c"])
+        Extension("htspy._indexing", ["src/htspy/_indexingmodule.c"])
     ],
 )

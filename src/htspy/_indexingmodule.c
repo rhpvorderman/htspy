@@ -134,7 +134,7 @@ static PyMethodDef VirtualFileOffset_methods[] = {
 
 static PyTypeObject VirtualFileOffset_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_name = "_bgzf.VirtualFileOffset",
+    .tp_name = "_indexing.VirtualFileOffset",
     .tp_basicsize = sizeof(VirtualFileOffset),
     .tp_dealloc = (destructor)VirtualFileOffset_dealloc,
     .tp_flags = Py_TPFLAGS_DEFAULT,
@@ -238,7 +238,7 @@ vfo_chunk_tuple_from_bytes(PyObject *module, PyObject *data) {
     return vfo_chunk_tuple;
 }
 
-static PyMethodDef _bgzf_methods[] = {
+static PyMethodDef _indexing_methods[] = {
     {"vfo_tuple_from_bytes", (PyCFunction)(void(*)(void))vfo_tuple_from_bytes,
     METH_O, vfo_tuple_from_bytes_doc},
     {"vfo_chunk_tuple_from_bytes", (PyCFunction)(void(*)(void))vfo_chunk_tuple_from_bytes,
@@ -246,18 +246,18 @@ static PyMethodDef _bgzf_methods[] = {
     {NULL}
 };
 
-static struct PyModuleDef _bgzf_module = {
+static struct PyModuleDef _indexing_module = {
     PyModuleDef_HEAD_INIT,
-    "_bgzf",
+    "_indexing",
     NULL,
     -1, 
-    _bgzf_methods
+    _indexing_methods
 };
 
 PyMODINIT_FUNC
-PyInit__bgzf(void){
+PyInit__indexing(void){
     PyObject *m;
-    m = PyModule_Create(&_bgzf_module);
+    m = PyModule_Create(&_indexing_module);
     if (m == NULL){
         return NULL;
     }

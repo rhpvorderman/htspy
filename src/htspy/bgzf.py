@@ -23,7 +23,7 @@ import struct
 import zlib
 from typing import Iterator, Optional
 
-from ._bgzf import VirtualFileOffset  # noqa: F401
+from ._indexing import VirtualFileOffset  # noqa: F401
 
 try:
     from isal import isal_zlib
