@@ -23,7 +23,7 @@ import struct
 import zlib
 from typing import Iterator, Optional
 
-from ._indexing import VirtualFileOffset  # noqa: F401
+from ._indexing import VirtualFileOffset
 
 try:
     from isal import isal_zlib
@@ -161,8 +161,10 @@ class BGZFReader:
         if size == -1:
             return self.readall()
         current_pos = self._buffer.tell()
-        if current_pos == self._bytes_in_buffer:
+        if current_pos >= self._bytes_in_buffer:
             # End of current buffer reached, read new block
+            # The larger than serves to allow us discard the buffer by only
+            # setting the size to 0.
             block = self.read_block()
             if not block:
                 return b""
@@ -194,6 +196,21 @@ class BGZFReader:
             self._buffer.write(block)
         self._buffer.seek(current_pos)
         return self._buffer.read()
+
+    def range_iter(self, start: VirtualFileOffset, end: VirtualFileOffset
+                   ) -> Iterator[bytes]:
+        start_block = self._fetch_block(start.coffset)
+        if start.coffset == end.coffset:
+            yield start_block[start.uoffset: end.uoffset]
+            return
+        else:
+            yield start_block[start.uoffset:]
+
+    def _fetch_block(self, coffset: int):
+        """Fetch a block at an offset in a cacheable manner."""
+        self._bytes_in_buffer = 0
+        self._file.seek(coffset)
+        return self.read_block()
 
 
 def _zlib_compress(data, level: int = -1, wbits: int = zlib.MAX_WBITS) -> bytes:
