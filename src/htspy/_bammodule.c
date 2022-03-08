@@ -24,6 +24,9 @@
 
 #include "_conversions.h"
 
+#define BAM_CIGAR_MAX_COUNT 0xFFFFFFF
+#define BAM_CIGAR_MAX_OP 9
+
 static PyObject * 
 encode_cigar_string(char * string, Py_ssize_t length) {
     // A CIGAR string uses at least two characters per operation-length 
@@ -67,15 +70,20 @@ BamCigar_FromBytesAndSize(PyObject * bytes, Py_ssize_t n_cigar_op) {
     return (PyO)
 }
 
+#define BAMCIGAR_FROM_ITER_ERROR_EXIT Py_DECREF(cigartuples);Py_DECREF(raw); return NULL;   
 static PyObject *
-BamCigar__init__(PyTypeObject * cls, PyObject * cigartuples) {
-    if (!PyList_CheckExact(cigartuples)) {
-        PyErr_Format(PyExc_TypeError, "Expected a list got %s.", 
-                     Py_TYPE(cigartuples)->tp_name);
+BamCigar_from_iter(PyTypeObject * cls, PyObject * cigartuples_in) {
+    PyObject * cigartuples = PySequence_Fast(
+        cigartuples_in, "cigartuples must be an iterable");
+    if (cigartuples == NULL){
         return NULL;
     }
-    Py_ssize_t n_cigar_op = PyList_GET_SIZE(cigartuples);
+    Py_ssize_t n_cigar_op = PySequence_Fast_GET_SIZE(cigartuples);
     PyObject * raw = PyBytes_FromStringAndSize(NULL, n_cigar_op * sizeof(uint32_t));
+    if (raw == NULL){
+        Py_DECREF(cigartuples);
+        return PyErr_NoMemory();
+    }
     Py_ssize_t i = 0;
     PyObject * tup;
     PyObject * operation; 
@@ -84,18 +92,20 @@ BamCigar__init__(PyTypeObject * cls, PyObject * cigartuples) {
     Py_ssize_t count_i;
     
     while (i < n_cigar_op) {
-        tup = PyList_GET_ITEM(cigartuples, i);
+        tup = PySequence_Fast_GET_ITEM(cigartuples, i);
         if (!PyTuple_CheckExact(tup)) {
             PyErr_Format(PyExc_TypeError, 
                          "List should only consist of tuples got '%s' for "
                          "item: %R", 
-                         Py_TYPE(tup)->tp_name, tup);            
+                         Py_TYPE(tup)->tp_name, tup);
+            BAMCIGAR_FROM_ITER_ERROR_EXIT
         }
         if (PyTuple_GET_SIZE(tup) != 2) {
             PyErr_Format(PyExc_ValueError, 
                          "Tuples should consist of 2 items got '%ld' for "
                          "item: %r", 
-                          PyTuple_GET_SIZE(tup), tup);    
+                          PyTuple_GET_SIZE(tup), tup);
+            BAMCIGAR_FROM_ITER_ERROR_EXIT
         }
         operation = PyTuple_GET_ITEM(tup, 0);
         count = PyTuple_GET_ITEM(tup, 1);
@@ -103,16 +113,26 @@ BamCigar__init__(PyTypeObject * cls, PyObject * cigartuples) {
               PyErr_Format(PyExc_TypeError, 
                            "Operation should be of type int, got '%s' for "
                            "cigartuple: %R", 
-                           Py_TYPE(operation)->tp_name, tup);        
+                           Py_TYPE(operation)->tp_name, tup); 
+            BAMCIGAR_FROM_ITER_ERROR_EXIT   
         }
         if (!PyLong_CheckExact(count)) {
               PyErr_Format(PyExc_TypeError, 
                            "Count should be of type int, got '%s' for "
                            "cigartuple: %R", 
-                           Py_TYPE(count)->tp_name, tup);        
+                           Py_TYPE(count)->tp_name, tup); 
+            BAMCIGAR_FROM_ITER_ERROR_EXIT     
         }
         operation_i = PyLong_AsSsize_t(operation);
         count_i = PyLong_AsSsize_t(count);
+        if ((operation_i > BAM_CIGAR_MAX_OP) || (operation_i < 0)){
+            PyErr_Format(
+                PyExc_ValueError, 
+                "Operation should be between 0 and %d. "
+                "Got %ld for cigartuple: %R",
+                BAM_CIGAR_MAX_OP, count_i, tup);
+            BAMCIGAR_FROM_ITER_ERROR_EXIT
+        }
     }
 }
 

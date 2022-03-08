@@ -58,26 +58,20 @@ CIGAR_TUPLES = [
     (CigarOp.BACK, 268_435_435)
 ]
 
-@pytest.fixture(scope="module")
-def bam_cigar():
-    return BamCigar(CIGAR_TUPLES)
-
-
-def test_bam_cigar_to_string(bam_cigar):
-    assert bam_cigar.to_string() == CIGAR_STRING
-
-def test_bam_cigar_from_string():
-    assert BamCigar.from_string(CIGAR_STRING).to_tuples == CIGAR_TUPLES
+def test_bam_cigar___init__():
+    assert BamCigar(CIGAR_STRING).number_of_operations == 9
 
 def test_bam_cigar__str__(bam_cigar):
-    assert str(bam_cigar) == CIGAR_STRING
+    assert str(BamCigar(CIGAR_STRING)) == CIGAR_STRING
 
 
-def test_bam_cigar_to_tuples(bam_cigar):
-    assert bam_cigar.to_tuples() ==
+def test_bam_cigar_to_tuples():
+    assert list(BamCigar(CIGAR_STRING)) == CIGAR_TUPLES
+
 
 
 def test_bam_cigar_buffer(bam_cigar):
+    bam_cigar = BamCigar(CIGAR_STRING)
     view = memoryview(bam_cigar)
     assert view.tobytes() == bam_cigar.raw
     assert view.nbytes == len(bam_cigar.raw)
