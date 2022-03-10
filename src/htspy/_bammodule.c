@@ -159,7 +159,7 @@ BamCigar_from_iter(PyTypeObject *type, PyObject *cigartuples_in) {
                 "Got %ld for cigartuple: %R",
                 BAM_CIGAR_MAX_COUNT, count_i, tup);
         }
-        voffset = (count_i << 4) & operation_i;
+        voffset = (count_i << 4) | operation_i;
         voffset_array[i] = voffset;
         i += 1;
     }
@@ -295,7 +295,7 @@ BamCigar__init__(BamCigar *self, PyObject *args, PyObject *kwargs) {
                 endptr[0]);
             Py_DECREF(raw); return -1;
         }
-        cigar[i] = (count << 4) & operation;
+        cigar[i] = (count << 4) | operation;
         i += 1;
         cursor = endptr + 1;
     }
