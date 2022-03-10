@@ -69,13 +69,13 @@ BamCigar_FromBytesAndSize(PyObject * bytes, Py_ssize_t n_cigar_op) {
     cigar->n_cigar_op = n_cigar_op;
     return (PyObject *)cigar;
 }
+
 PyDoc_STRVAR(BamCigar_from_iter__doc__,
-"compress($cls, cigartuples, /)\n"
+"from_iter($cls, cigartuples, /)\n"
 "--\n"
 "\n"
 "Create a new BamCigar from an iterable of (operation, count) tuples.\n"
 );
-
 #define BAM_CIGAR_FROM_ITER_METHODDEF    \
     {"from_iter", (PyCFunction)(void(*)(void))BamCigar_from_iter, \
     METH_O | METH_CLASS, BamCigar_from_iter__doc__}
@@ -160,6 +160,25 @@ BamCigar_from_iter(PyTypeObject *type, PyObject *cigartuples_in) {
     return BamCigar_FromBytesAndSize(raw, n_cigar_op);
 }
 
+PyDoc_STRVAR(BamCigar_from_bytes__doc__,
+"from_iter($cls, b, /)\n"
+"--\n"
+"\n"
+"Create a new BamCigar from a bytes object b.\n"
+"\n"
+"This is the fastest method, as the bytes object is referenced internally\n"
+"instead of being copied."
+);
+#define BAM_CIGAR_FROM_BYTES_METHODDEF    \
+    {"from_bytes", (PyCFunction)(void(*)(void))BamCigar_from_bytes, \
+    METH_O | METH_CLASS, BamCigar_from_bytes__doc__}
+
+static PyObject *
+BamCigar_from_bytes(PyTypeObject *type, PyObject *bytes) {
+    if (!PyBytes_CheckExact(bytes)){
+        PyErrFormat(Py)
+    }
+}
 static PyMethodDef BamCigar_methods[] = {
     BAM_CIGAR_FROM_ITER_METHODDEF,
     {NULL}
