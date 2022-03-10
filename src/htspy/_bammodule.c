@@ -69,10 +69,20 @@ BamCigar_FromBytesAndSize(PyObject * bytes, Py_ssize_t n_cigar_op) {
     cigar->n_cigar_op = n_cigar_op;
     return (PyObject *)cigar;
 }
+PyDoc_STRVAR(BamCigar_from_iter__doc__,
+"compress($cls, cigartuples, /)\n"
+"--\n"
+"\n"
+"Create a new BamCigar from an iterable of (operation, count) tuples.\n"
+);
+
+#define BAM_CIGAR_FROM_ITER_METHODDEF    \
+    {"from_iter", (PyCFunction)(void(*)(void))BamCigar_from_iter, \
+    METH_O | METH_CLASS, BamCigar_from_iter__doc__}
 
 #define BAMCIGAR_FROM_ITER_ERROR_EXIT Py_DECREF(cigartuples);Py_DECREF(raw); return NULL;   
 static PyObject *
-BamCigar_from_iter(PyTypeObject * cls, PyObject * cigartuples_in) {
+BamCigar_from_iter(PyTypeObject *type, PyObject *cigartuples_in) {
     PyObject * cigartuples = PySequence_Fast(
         cigartuples_in, "cigartuples must be an iterable");
     if (cigartuples == NULL){
@@ -150,11 +160,17 @@ BamCigar_from_iter(PyTypeObject * cls, PyObject * cigartuples_in) {
     return BamCigar_FromBytesAndSize(raw, n_cigar_op);
 }
 
+static PyMethodDef BamCigar_methods[] = {
+    BAM_CIGAR_FROM_ITER_METHODDEF,
+    {NULL}
+};
+
 static PyTypeObject BamCigar_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
     .tp_name = "_pybam.BamCigar",
     .tp_basicsize = sizeof(BamCigar),
-    .tp_dealloc = (destructor)BamCigar_dealloc
+    .tp_dealloc = (destructor)BamCigar_dealloc,
+    .tp_methods = BamCigar_methods,
 };
 
 typedef struct {
