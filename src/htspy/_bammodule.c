@@ -27,17 +27,6 @@
 #define BAM_CIGAR_MAX_COUNT 0xFFFFFFF
 #define BAM_CIGAR_MAX_OP 9
 
-static PyObject * 
-encode_cigar_string(char * string, Py_ssize_t length) {
-    // A CIGAR string uses at least two characters per operation-length 
-    // combination. An encoded cigar uses one 32-bit integer per 
-    // operation-length combination. That is 4 bytes. So we need at most 
-    // (length / 2) * 4 == length * 2 unsigned integers.
-    PyObject * ret_val = PyBytes_FromStringAndSize(NULL, length * 2);
-    uint32_t * cigar = (uint32_t *)PyBytest_AS_STRING(ret_val);
-    char * tail_ptr;
-}
-
 typedef struct {
     PyObject_HEAD
     PyObject * raw;
@@ -105,7 +94,7 @@ BamCigar_from_iter(PyTypeObject *type, PyObject *cigartuples_in) {
         Py_DECREF(cigartuples);
         return PyErr_NoMemory();
     }
-    uint32_t * voffset_array = PyBytes_AS_STRING(raw);
+    uint32_t * voffset_array = (uint32_t *)PyBytes_AS_STRING(raw);
     Py_ssize_t i = 0;
     PyObject * tup;
     PyObject * operation; 
@@ -229,38 +218,44 @@ BamCigar_from_buffer(PyTypeObject *type, PyObject *data) {
     return BamCigar_FromBytesAndSize(raw, buffer.len / 4);
 }
 
-PyDoc_STRVAR(BamCigar_from_string__doc__,
+PyDoc_STRVAR(BamCigar_init__doc__,
 "__init__($cls, cigarstring, /)\n"
 "--\n"
 "\n"
 "Create a new BamCigar from a cigarstring.\n"
 );
 
-#define BAM_CIGAR_FROM_STRING_METHODDEF    \
-    {"__init__", (PyCFunction)(void(*)(void))BamCigar_from_string, \
-    METH_O | METH_CLASS, BamCigar_from_string__doc__}
-
-static PyObject *
-BamCigar_from_string(PyTypeObject *type, PyObject *cigarstring) {
+static int
+BamCigar__init__(BamCigar *self, PyObject *args, PyObject *kwargs) {
+    self->cigar = NULL;
+    self->raw = NULL;
+    PyObject * cigarstring = NULL;
+    char * keywords[] = {"", NULL};
+    const char *format = "O|:BamCigar.__init__";
+    if (!PyArg_ParseTupleAndKeywords(
+            args, kwargs, format, keywords, &cigarstring)) {
+        return -1;
+    }
     if (!PyUnicode_CheckExact(cigarstring)) {
         PyErr_Format(PyExc_TypeError, "cigarstring must be of type str, got %s",
             Py_TYPE(cigarstring)->tp_name);
-        return NULL;
+        return -1;
     }
     if (!PyUnicode_IS_COMPACT_ASCII(cigarstring)) {
         PyErr_SetString(PyExc_ValueError, 
             "cigarstring must be a valid ascii string");
-        return NULL;
+        return -1;
     }
     Py_ssize_t string_size = PyUnicode_GET_LENGTH(cigarstring);
-    char * cigar_string_ptr = PyUnicode_AS_DATA(cigarstring);
+    char * cigar_string_ptr = (char *)PyUnicode_1BYTE_DATA(cigarstring);
     char * cigar_string_end = cigar_string_ptr + string_size;
     // uint32_t is 4 bytes. A string needs at least 2 characters to encode a
     // a cigarop + count. So maximum number of cigarops is string_size / 2.
     Py_ssize_t maximum_cigar_op = string_size / 2;
     PyObject * raw = PyBytes_FromStringAndSize(NULL, maximum_cigar_op * sizeof(uint32_t));
     if (raw == NULL) {
-        return PyErr_NoMemory();
+        PyErr_NoMemory();
+        return -1;
     }
     uint32_t * cigar = (uint32_t *)PyBytes_AS_STRING(raw);
     Py_ssize_t i = 0;
@@ -271,26 +266,27 @@ BamCigar_from_string(PyTypeObject *type, PyObject *cigarstring) {
     while (cursor < cigar_string_end){
         count = strtol(cursor, &endptr, 10);
         if ((count < 0)) {
-            PyErr_Format("Invalid cigarstring: %R", cigarstring);
-            Py_DECREF(raw); return NULL;
+            PyErr_Format(PyExc_ValueError, "Invalid cigarstring: %R", 
+                         cigarstring);
+            Py_DECREF(raw); return -1;
         }
         if ((count > BAM_CIGAR_MAX_COUNT)) {
             PyErr_Format(
                 PyExc_ValueError, "Maximum count exceeded: %ld > %ld",
                 count, BAM_CIGAR_MAX_COUNT);
-            Py_DECREF(raw); return NULL;
+            Py_DECREF(raw); return -1;
         }
         if (endptr >= cigar_string_end) {
             PyErr_Format(
                 PyExc_ValueError, "Truncated cigarstring: %R",
                     cigarstring);
-            Py_DECREF(raw); return NULL;
+            Py_DECREF(raw); return -1;
         } 
-        operation = bam_cigar_table[endptr[0]];
+        operation = bam_cigar_table[(uint8_t)endptr[0]];
         if (operation == -1) {
             PyErr_Format(PyExc_ValueError, "Invalid cigar operation: '%c'", 
-            endptr[0]);
-            Py_DECREF(raw); return NULL;
+                endptr[0]);
+            Py_DECREF(raw); return -1;
         }
         cigar[i] = (count << 4) & operation;
         i += 1;
@@ -299,16 +295,18 @@ BamCigar_from_string(PyTypeObject *type, PyObject *cigarstring) {
     Py_ssize_t n_cigar_op = i; 
     // Make sure the bytes object is made smaller if necessary.
     if (_PyBytes_Resize(&raw, n_cigar_op * 4) == -1){
-        Py_DECREF(raw); return NULL;
+        Py_DECREF(raw); return -1;
     }
-    return BamCigar_FromBytesAndSize(raw, n_cigar_op);
+    self->raw = raw;
+    self->n_cigar_op = n_cigar_op;
+    self->cigar = cigar;
+    return 0;
 }
 
 static PyMethodDef BamCigar_methods[] = {
     BAM_CIGAR_FROM_ITER_METHODDEF,
     BAM_CIGAR_FROM_BYTES_METHODDEF,
     BAM_CIGAR_FROM_BUFFER_METHODDEF,
-    BAM_CIGAR_FROM_STRING_METHODDEF,
     {NULL}
 };
 
@@ -317,8 +315,11 @@ static PyTypeObject BamCigar_Type = {
     .tp_name = "_pybam.BamCigar",
     .tp_basicsize = sizeof(BamCigar),
     .tp_dealloc = (destructor)BamCigar_dealloc,
+    .tp_init = (initproc)BamCigar__init__,
+    .tp_doc = BamCigar_init__doc__,
     .tp_methods = BamCigar_methods,
     .tp_getset = BamCigar_properties,
+    .tp_new = PyType_GenericNew
 };
 
 typedef struct {
