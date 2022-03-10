@@ -27,12 +27,12 @@ import pytest
 CIGAR_STRING = ("1M"  # Test different digit lengths
                 "20I"
                 "300D"
-                "4_000N"
-                "50_000S"
-                "600_000H"
-                "7_000_000P"
-                "80_000_000="
-                "268_435_435X")  # Maximum value: 2^28 - 1
+                "4000N"
+                "50000S"
+                "600000H"
+                "7000000P"
+                "80000000="
+                "268435435X")  # Maximum value: 2^28 - 1
 
 CIGAR_NUMBER_LIST = [
     (1 << 4) | CigarOp.MATCH,
@@ -59,7 +59,8 @@ CIGAR_TUPLES = [
 ]
 
 def test_bam_cigar___init__():
-    assert BamCigar(CIGAR_STRING).number_of_operations == 9
+    bam_cigar = BamCigar(CIGAR_STRING)
+    assert bam_cigar.number_of_operations == 9
 
 def test_bam_cigar__str__(bam_cigar):
     assert str(BamCigar(CIGAR_STRING)) == CIGAR_STRING
