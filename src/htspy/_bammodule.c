@@ -54,16 +54,15 @@ BamCigar_dealloc(BamCigar *self) {
 }
 
 /**
- * @brief Creates a new BamCigar without checks. For internal calls only.
+ * @brief Creates a new BamCigar without checks. For internal calls only. Steals a reference.
  * 
- * @param bytes a PyBytesObject (not checked)
+ * @param bytes a PyBytesObject (not checked, reference stealed.)
  * @param n_cigar_op (number of cigar units. Not checked with length of Bytes object.)
  * @return PyObject* 
  */
 static PyObject *
 BamCigar_FromBytesAndSize(PyObject * bytes, Py_ssize_t n_cigar_op) {
     BamCigar *cigar = PyObject_New(BamCigar, &BamCigar_Type);
-    Py_INCREF(bytes);
     cigar->raw = bytes;
     cigar->cigar = (uint32_t *)PyBytes_AS_STRING(bytes);
     cigar->n_cigar_op = n_cigar_op;
@@ -161,7 +160,7 @@ BamCigar_from_iter(PyTypeObject *type, PyObject *cigartuples_in) {
 }
 
 PyDoc_STRVAR(BamCigar_from_bytes__doc__,
-"from_iter($cls, b, /)\n"
+"from_bytes($cls, b, /)\n"
 "--\n"
 "\n"
 "Create a new BamCigar from a bytes object b.\n"
@@ -185,12 +184,43 @@ BamCigar_from_bytes(PyTypeObject *type, PyObject *b) {
         PyErr_SetString(PyExc_ValueError, "Size of b must be a multiple of 4");
         return NULL;
     }
+    Py_INCREF(b);
     return BamCigar_FromBytesAndSize(b, size / 4);
+}
+
+PyDoc_STRVAR(BamCigar_from_buffer__doc__,
+"from_buffer($cls, data, /)\n"
+"--\n"
+"\n"
+"Create a new BamCigar from an object that supports the buffer protocol.\n"
+"\n"
+"Objects that support the buffer protocol include bytes, bytesarray, array.array,\n"
+"numpy arrays and others."
+);
+
+#define BAM_CIGAR_FROM_BUFFER_METHODDEF    \
+    {"from_buffer", (PyCFunction)(void(*)(void))BamCigar_from_buffer, \
+    METH_O | METH_CLASS, BamCigar_from_buffer__doc__}
+
+static PyObject *
+BamCigar_from_buffer(PyTypeObject *type, PyObject *data) {
+    Py_buffer buffer;
+    if (PyObject_GetBuffer(data, &buffer, PyBUF_SIMPLE) != 0) {
+        return NULL;
+    }
+    if (buffer.len % 4) {
+        PyErr_SetString(PyExc_ValueError, 
+            "buffer length not a multiple of 4");
+        return NULL;
+    }
+    PyObject * raw = PyBytes_FromStringAndSize((char *)buffer.buf, buffer.len);
+    return BamCigar_FromBytesAndSize(raw, buffer.len / 4);
 }
 
 static PyMethodDef BamCigar_methods[] = {
     BAM_CIGAR_FROM_ITER_METHODDEF,
     BAM_CIGAR_FROM_BYTES_METHODDEF,
+    BAM_CIGAR_FROM_BUFFER_METHODDEF,
     {NULL}
 };
 
