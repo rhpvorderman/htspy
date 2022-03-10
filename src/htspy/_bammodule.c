@@ -174,13 +174,23 @@ PyDoc_STRVAR(BamCigar_from_bytes__doc__,
     METH_O | METH_CLASS, BamCigar_from_bytes__doc__}
 
 static PyObject *
-BamCigar_from_bytes(PyTypeObject *type, PyObject *bytes) {
-    if (!PyBytes_CheckExact(bytes)){
-        PyErrFormat(Py)
+BamCigar_from_bytes(PyTypeObject *type, PyObject *b) {
+    if (!PyBytes_CheckExact(b)){
+        PyErr_Format(PyExc_TypeError, "b must be a bytes object, got %s.",
+                     Py_TYPE(b)->tp_name);
+        return NULL;
     }
+    Py_ssize_t size = PyBytes_GET_SIZE(b);
+    if (size % 4){
+        PyErr_SetString(PyExc_ValueError, "Size of b must be a multiple of 4");
+        return NULL;
+    }
+    return BamCigar_FromBytesAndSize(b, size / 4);
 }
+
 static PyMethodDef BamCigar_methods[] = {
     BAM_CIGAR_FROM_ITER_METHODDEF,
+    BAM_CIGAR_FROM_BYTES_METHODDEF,
     {NULL}
 };
 
