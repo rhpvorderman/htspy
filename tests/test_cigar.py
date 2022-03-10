@@ -32,7 +32,8 @@ CIGAR_STRING = ("1M"  # Test different digit lengths
                 "600000H"
                 "7000000P"
                 "80000000="
-                "268435435X")  # Maximum value: 2^28 - 1
+                "268435435X"  # Maximum value: 2^28 - 1
+                "9B")
 
 CIGAR_NUMBER_LIST = [
     (1 << 4) | CigarOp.MATCH,
@@ -43,7 +44,8 @@ CIGAR_NUMBER_LIST = [
     (600_000 << 4) | CigarOp.HARD_CLIP,
     (7_000_000 << 4) | CigarOp.PAD,
     (80_000_000 << 4) | CigarOp.EQUAL,
-    (268_435_435 << 4) | CigarOp.BACK,
+    (268_435_435 << 4) | CigarOp.DIFF,
+    (9 << 4) | CigarOp.BACK,
 ]
 
 CIGAR_TUPLES = [
@@ -55,12 +57,13 @@ CIGAR_TUPLES = [
     (CigarOp.HARD_CLIP, 600_000),
     (CigarOp.PAD, 7_000_000),
     (CigarOp.EQUAL, 80_000_000),
-    (CigarOp.BACK, 268_435_435)
+    (CigarOp.DIFF, 268_435_435),
+    (CigarOp.BACK, 9)
 ]
 
 def test_bam_cigar___init__():
     bam_cigar = BamCigar(CIGAR_STRING)
-    assert bam_cigar.number_of_operations == 9
+    assert bam_cigar.number_of_operations == len(CIGAR_TUPLES)
 
 def test_bam_cigar__str__(bam_cigar):
     assert str(BamCigar(CIGAR_STRING)) == CIGAR_STRING
