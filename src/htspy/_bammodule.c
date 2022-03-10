@@ -69,6 +69,18 @@ BamCigar_FromBytesAndSize(PyObject * bytes, Py_ssize_t n_cigar_op) {
     return (PyObject *)cigar;
 }
 
+static PyObject * 
+BamCigar_raw(BamCigar *self, void *closure){
+    Py_INCREF(self->raw);
+    return self->raw;
+} 
+
+static PyGetSetDef BamCigar_properties[] = {
+    {"raw", (getter)BamCigar_raw, NULL, 
+    "The underlying bytes object with the cigar array.", NULL},
+    {NULL},
+};
+
 PyDoc_STRVAR(BamCigar_from_iter__doc__,
 "from_iter($cls, cigartuples, /)\n"
 "--\n"
@@ -230,6 +242,7 @@ static PyTypeObject BamCigar_Type = {
     .tp_basicsize = sizeof(BamCigar),
     .tp_dealloc = (destructor)BamCigar_dealloc,
     .tp_methods = BamCigar_methods,
+    .tp_getset = BamCigar_properties,
 };
 
 typedef struct {
