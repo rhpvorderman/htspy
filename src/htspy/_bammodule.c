@@ -64,9 +64,16 @@ BamCigar_raw(BamCigar *self, void *closure){
     return self->raw;
 } 
 
+static PyObject *
+BamCigar_number_of_operations(BamCigar *self, void *closure){
+    return PyLong_FromSsize_t(self->n_cigar_op);
+}
+
 static PyGetSetDef BamCigar_properties[] = {
     {"raw", (getter)BamCigar_raw, NULL, 
     "The underlying bytes object with the cigar array.", NULL},
+    {"number_of_operations", (getter)BamCigar_number_of_operations, NULL, 
+    "The number of CIGAR operations (n_cigar_op).", NULL},
     {NULL},
 };
 
