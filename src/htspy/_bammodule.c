@@ -66,8 +66,8 @@ BamCigar_FromBytesAndSize(PyObject * bytes, Py_ssize_t n_cigar_op) {
     Py_INCREF(bytes);
     cigar->raw = bytes;
     cigar->cigar = (uint32_t *)PyBytes_AS_STRING(bytes);
-    cigar->n_cigar_op;
-    return (PyO)
+    cigar->n_cigar_op = n_cigar_op;
+    return (PyObject *)cigar;
 }
 
 #define BAMCIGAR_FROM_ITER_ERROR_EXIT Py_DECREF(cigartuples);Py_DECREF(raw); return NULL;   
@@ -84,12 +84,14 @@ BamCigar_from_iter(PyTypeObject * cls, PyObject * cigartuples_in) {
         Py_DECREF(cigartuples);
         return PyErr_NoMemory();
     }
+    uint32_t * voffset_array = PyBytes_AS_STRING(raw);
     Py_ssize_t i = 0;
     PyObject * tup;
     PyObject * operation; 
     PyObject * count; 
     Py_ssize_t operation_i;
     Py_ssize_t count_i;
+    uint32_t voffset;
     
     while (i < n_cigar_op) {
         tup = PySequence_Fast_GET_ITEM(cigartuples, i);
@@ -130,10 +132,22 @@ BamCigar_from_iter(PyTypeObject * cls, PyObject * cigartuples_in) {
                 PyExc_ValueError, 
                 "Operation should be between 0 and %d. "
                 "Got %ld for cigartuple: %R",
-                BAM_CIGAR_MAX_OP, count_i, tup);
+                BAM_CIGAR_MAX_OP, operation_i, tup);
             BAMCIGAR_FROM_ITER_ERROR_EXIT
         }
+        if ((count_i > BAM_CIGAR_MAX_COUNT) || (count_i < 0)) {
+            PyErr_Format(
+                PyExc_ValueError, 
+                "Count should be between 0 and %d. "
+                "Got %ld for cigartuple: %R",
+                BAM_CIGAR_MAX_COUNT, count_i, tup);
+        }
+        voffset = (count_i << 4) & operation_i;
+        voffset_array[i] = voffset;
+        i += 1;
     }
+    Py_DECREF(cigartuples);
+    return BamCigar_FromBytesAndSize(raw, n_cigar_op);
 }
 
 static PyTypeObject BamCigar_Type = {
