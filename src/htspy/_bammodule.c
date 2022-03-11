@@ -40,6 +40,7 @@ static PyTypeObject BamCigar_Type;  // Forward declaration
 static void 
 BamCigar_dealloc(BamCigar *self) {
     Py_CLEAR(self->raw);
+    Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
 /**
@@ -317,16 +318,71 @@ static PyMethodDef BamCigar_methods[] = {
     {NULL}
 };
 
+
+typedef struct {
+    PyObject_HEAD
+    PyObject * bam_cigar;
+    uint32_t * cigar;
+    Py_ssize_t n_cigar_op;
+    Py_ssize_t pos;
+} BamCigarIter;
+
+static void 
+BamCigarIter_dealloc(BamCigarIter * self) {
+    Py_CLEAR(self->bam_cigar);
+    Py_TYPE(self)->tp_free((PyObject *)self);
+}
+
+static PyObject*
+BamCigarIter__next__(BamCigarIter * self) {
+    if (self->pos == self->n_cigar_op) {
+        PyErr_SetNone(PyExc_StopIteration);
+        return NULL;
+    }
+    uint32_t c = self->cigar[self->pos];
+    Py_ssize_t cigar_op = bam_cigar_op(c);
+    Py_ssize_t cigar_oplen = bam_cigar_oplen(c); 
+    self->pos += 1;
+    return PyTuple_Pack(2, 
+        PyLong_FromSsize_t(cigar_op), PyLong_FromSsize_t(cigar_oplen));
+}
+
+static PyObject *
+BamCigarIter__iter__(BamCigarIter * self) {
+    Py_INCREF(self);
+    return (PyObject *)self;
+}
+
+static PyTypeObject BamCigarIter_type = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_name = "_bam.BamCigarIter",
+    .tp_dealloc = (destructor)BamCigarIter_dealloc,
+    .tp_iter = (getiterfunc)BamCigarIter__iter__,
+    .tp_iternext = (iternextfunc)BamCigarIter__next__,
+};
+
+static PyObject * 
+BamCigar__iter__(BamCigar * self) {
+    BamCigarIter *iter = PyObject_NEW(BamCigarIter, &BamCigarIter_type);
+    Py_INCREF(self);
+    iter->bam_cigar = (PyObject *)self;
+    iter->cigar = self->cigar;
+    iter->n_cigar_op = self->n_cigar_op;
+    iter->pos = 0;
+    return (PyObject *)iter;
+}
+
 static PyTypeObject BamCigar_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_name = "_pybam.BamCigar",
+    .tp_name = "_bam.BamCigar",
     .tp_basicsize = sizeof(BamCigar),
     .tp_dealloc = (destructor)BamCigar_dealloc,
     .tp_init = (initproc)BamCigar__init__,
     .tp_doc = BamCigar_init__doc__,
     .tp_methods = BamCigar_methods,
     .tp_getset = BamCigar_properties,
-    .tp_new = PyType_GenericNew
+    .tp_new = PyType_GenericNew,
+    .tp_iter = (getiterfunc)BamCigar__iter__,
 };
 
 typedef struct {
@@ -826,8 +882,8 @@ static PyTypeObject BamIterator_Type = {
     .tp_basicsize = sizeof(BamIterator),
     .tp_dealloc =(destructor)BamIterator_dealloc,  
     .tp_flags = Py_TPFLAGS_DEFAULT,
-    .tp_iter = (PyObject * (*)(PyObject *))BamIterator_iter,
-    .tp_iternext = (PyObject * (*)(PyObject *))BamIterator_iternext
+    .tp_iter = (getiterfunc)BamIterator_iter,
+    .tp_iternext = (iternextfunc)BamIterator_iternext
 };
 
 PyDoc_STRVAR(bam_iterator_doc,
