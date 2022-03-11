@@ -20,7 +20,9 @@
 
 import array
 
-from htspy.bam import BamCigar, CigarOp
+from htspy.bam import BAM_CBACK, BAM_CDEL, BAM_CDIFF, BAM_CEQUAL, \
+    BAM_CHARD_CLIP, BAM_CINS, BAM_CMATCH, BAM_CPAD, BAM_CREF_SKIP, \
+    BAM_CSOFT_CLIP, BamCigar
 
 import pytest
 
@@ -36,34 +38,36 @@ CIGAR_STRING = ("1M"  # Test different digit lengths
                 "9B")
 
 CIGAR_NUMBER_LIST = [
-    (1 << 4) | CigarOp.MATCH,
-    (20 << 4) | CigarOp.INS,
-    (300 << 4) | CigarOp.DEL,
-    (4000 << 4) | CigarOp.REF_SKIP,
-    (50_000 << 4) | CigarOp.SOFT_CLIP,
-    (600_000 << 4) | CigarOp.HARD_CLIP,
-    (7_000_000 << 4) | CigarOp.PAD,
-    (80_000_000 << 4) | CigarOp.EQUAL,
-    (268_435_435 << 4) | CigarOp.DIFF,
-    (9 << 4) | CigarOp.BACK,
+    (1 << 4) | BAM_CMATCH,
+    (20 << 4) | BAM_CINS,
+    (300 << 4) | BAM_CDEL,
+    (4000 << 4) | BAM_CREF_SKIP,
+    (50_000 << 4) | BAM_CSOFT_CLIP,
+    (600_000 << 4) | BAM_CHARD_CLIP,
+    (7_000_000 << 4) | BAM_CPAD,
+    (80_000_000 << 4) | BAM_CEQUAL,
+    (268_435_435 << 4) | BAM_CDIFF,
+    (9 << 4) | BAM_CBACK,
 ]
 
 CIGAR_TUPLES = [
-    (CigarOp.MATCH, 1),
-    (CigarOp.INS, 20),
-    (CigarOp.DEL, 300),
-    (CigarOp.REF_SKIP, 4000),
-    (CigarOp.SOFT_CLIP, 50_0000),
-    (CigarOp.HARD_CLIP, 600_000),
-    (CigarOp.PAD, 7_000_000),
-    (CigarOp.EQUAL, 80_000_000),
-    (CigarOp.DIFF, 268_435_435),
-    (CigarOp.BACK, 9)
+    (BAM_CMATCH, 1),
+    (BAM_CINS, 20),
+    (BAM_CDEL, 300),
+    (BAM_CREF_SKIP, 4000),
+    (BAM_CSOFT_CLIP, 50_000),
+    (BAM_CHARD_CLIP, 600_000),
+    (BAM_CPAD, 7_000_000),
+    (BAM_CEQUAL, 80_000_000),
+    (BAM_CDIFF, 268_435_435),
+    (BAM_CBACK, 9)
 ]
+
 
 def test_bam_cigar___init__():
     bam_cigar = BamCigar(CIGAR_STRING)
     assert bam_cigar.number_of_operations == len(CIGAR_TUPLES)
+
 
 def test_bam_cigar__str__(bam_cigar):
     assert str(BamCigar(CIGAR_STRING)) == CIGAR_STRING
@@ -71,7 +75,6 @@ def test_bam_cigar__str__(bam_cigar):
 
 def test_bam_cigar_to_tuples():
     assert list(BamCigar(CIGAR_STRING)) == CIGAR_TUPLES
-
 
 
 def test_bam_cigar_buffer(bam_cigar):
