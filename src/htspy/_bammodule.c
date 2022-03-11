@@ -353,9 +353,11 @@ BamCigarIter__iter__(BamCigarIter * self) {
     return (PyObject *)self;
 }
 
-static PyTypeObject BamCigarIter_type = {
+static PyTypeObject BamCigarIter_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
     .tp_name = "_bam.BamCigarIter",
+    .tp_basicsize = sizeof(BamCigarIter),
+    .tp_flags = Py_TPFLAGS_DEFAULT,
     .tp_dealloc = (destructor)BamCigarIter_dealloc,
     .tp_iter = (getiterfunc)BamCigarIter__iter__,
     .tp_iternext = (iternextfunc)BamCigarIter__next__,
@@ -363,7 +365,7 @@ static PyTypeObject BamCigarIter_type = {
 
 static PyObject * 
 BamCigar__iter__(BamCigar * self) {
-    BamCigarIter *iter = PyObject_NEW(BamCigarIter, &BamCigarIter_type);
+    BamCigarIter *iter = PyObject_NEW(BamCigarIter, &BamCigarIter_Type);
     Py_INCREF(self);
     iter->bam_cigar = (PyObject *)self;
     iter->cigar = self->cigar;
@@ -954,6 +956,11 @@ PyInit__bam(void)
     Py_INCREF(BamCigarType);
     if (PyModule_AddObject(m, "BamCigar", BamCigarType) < 0)
         return NULL;
+    
+    // Ready BamCigarIterType but do not expose it.
+    if (PyType_Ready(&BamCigarIter_Type) < 0) {
+        return NULL;
+    }
 
     PyModule_AddIntMacro(m, BAM_CMATCH);
     PyModule_AddIntMacro(m, BAM_CINS);
