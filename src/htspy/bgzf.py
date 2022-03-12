@@ -71,20 +71,27 @@ def decompress_bgzf_blocks(file: io.BufferedReader) -> Iterator[bytes]:
         # Skip other xtra fields.
         file.read(xlen - 6)
         block_size = bsize - xlen - 19
-        block = file.read(block_size)
-        if len(block) < block_size:
-            raise EOFError(f"Truncated block at: {block_pos}")
+        block_peek = file.peek(1)
+        if block_peek[0] == 1:  # No compression.
+            length, inverse_length = struct.unpack("<HH", file.read(5)[1:])
+            if length != ~inverse_length & 0xFFFF or length != block_size - 5:
+                raise BGZFError(f"Corrupted uncompressed block at {block_pos}")
+            decompressed_block = file.read(length)
+        else:
+            block = file.read(block_size)
+            if len(block) < block_size:
+                raise EOFError(f"Truncated block at: {block_pos}")
+            # Decompress block, use the 64K as initial buffer size to avoid
+            # resizing of the buffer. (Max block size before compressing is
+            # slightly less than 64K for BGZF blocks). 64K is allocated faster
+            # than sizes that are not powers of 2.
+            decompressed_block = decompress(block,
+                                            wbits=-zlib.MAX_WBITS,
+                                            bufsize=65536)
         trailer = file.read(8)
         if len(trailer) < 8:
             raise EOFError(f"Truncated block at: {block_pos}")
         crc, isize = struct.unpack("<II", trailer)
-        # Decompress block, use the 64K as initial buffer size to avoid
-        # resizing of the buffer. (Max block size before compressing is
-        # slightly less than 64K for BGZF blocks). 64K is allocated faster
-        # than sizes that are not powers of 2.
-        decompressed_block = decompress(block,
-                                        wbits=-zlib.MAX_WBITS,
-                                        bufsize=65536)
         if crc != crc32(decompressed_block):
             raise BGZFError("Checksum fail of decompressed block")
         if isize != len(decompressed_block):
@@ -162,7 +169,7 @@ class BGZFReader:
         return self._buffer.read()
 
 
-def _zlib_compress(data, level, wbits):
+def _zlib_compress(data, level: int = -1, wbits: int = zlib.MAX_WBITS) -> bytes:
     """zlib.compress but with a wbits parameter."""
     compressobj = zlib.compressobj(level, wbits=wbits)
     return compressobj.compress(data) + compressobj.flush()
@@ -175,26 +182,27 @@ class BGZFWriter:
         self._buffer_size = 0
         self._buffer.seek(0)
         if isal_zlib:
-            if compresslevel == 0:
-                # No compression deflate blocks not supported by ISA-L.
-                compress = _zlib_compress
-            else:
-                compress = isal_zlib.compress
+            compress = isal_zlib.compress
             crc32 = isal_zlib.crc32
-            default_compresslevel = 1
         else:
             compress = _zlib_compress
             crc32 = zlib.crc32  # type: ignore
-            default_compresslevel = 1
+        default_compresslevel = 1
         self._compress = compress
         self._crc32 = crc32
-        self.compresslevel = compresslevel or default_compresslevel
+        self.compresslevel = (compresslevel if compresslevel is not None
+                              else default_compresslevel)
 
     def close(self):
         self.flush()
-        self.flush()  # Second flush writes empty EOF block.
+        self.write_eof_block()
         self._buffer.close()
         self._file.close()
+
+    def write_eof_block(self):
+        self._file.write(b"\x1f\x8b\x08\x04\x00\x00\x00\x00\x00\xff\x06\x00"
+                         b"\x42\x43\x02\x00\x1b\x00\x03\x00\x00\x00\x00\x00"
+                         b"\x00\x00\x00\x00")
 
     def __enter__(self):
         return self
@@ -204,20 +212,41 @@ class BGZFWriter:
 
     def flush(self):
         data_view = self._buffer.getbuffer()[:self._buffer_size]
-        compressed_block = self._compress(data_view, self.compresslevel,
-                                          wbits=-zlib.MAX_WBITS)
-        # Length of the compressed block + generic gzip header (10 bytes) +
-        # XLEN field (2 bytes)
-        bgzf_block_size_bytes = struct.pack("H", len(compressed_block) + 25)
-        trailer = struct.pack("<II",
-                              self._crc32(data_view),
-                              data_view.nbytes & 0xFFFFFFFF)
-        self._file.write(BGZF_BASE_HEADER)
-        self._file.write(bgzf_block_size_bytes)
-        self._file.write(compressed_block)
-        self._file.write(trailer)
+        self.write_block(data_view)
         self._buffer_size = 0
         self._buffer.seek(0)
+
+    def write_block(self, data):
+        """Write a block of data immediately to the BGZF file as a block."""
+        data_length = len(data)
+        if data_length > BGZF_BLOCK_SIZE:
+            raise ValueError(f"Cannot write data larger than "
+                             f"{BGZF_BLOCK_SIZE} to a BGZF block.")
+        self._file.write(BGZF_BASE_HEADER)
+        if self.compresslevel:
+            compressed_block = self._compress(data, self.compresslevel,
+                                              wbits=-zlib.MAX_WBITS)
+            # Length of the compressed block + generic gzip header (10 bytes) +
+            # XLEN field (2 bytes)
+            bgzf_block_size_bytes = struct.pack("<H", len(compressed_block) + 25)
+            self._file.write(bgzf_block_size_bytes)
+            self._file.write(compressed_block)
+        else:
+            size_and_deflate_header = struct.pack(
+                "<HBHH",
+                data_length + 30,  # +5 for deflate header, + 25 for rest of block.
+                # Deflate block header: first bit signifying last block;
+                # second and third bit 0 and 0 means uncompressed block.
+                1,
+                data_length,  # LEN
+                ~data_length & 0xFFFF,  # NLEN
+            )
+            self._file.write(size_and_deflate_header)
+            self._file.write(data)
+        trailer = struct.pack("<II",
+                              self._crc32(data),
+                              data_length)
+        self._file.write(trailer)
 
     def write(self, data):
         data_length = len(data)
@@ -234,12 +263,3 @@ class BGZFWriter:
             self._buffer.write(data)
             self._buffer_size = new_size
         return data_length
-
-    def write_block(self, data):
-        data_length = len(data)
-        new_size = self._buffer_size + data_length
-        if new_size > BGZF_BLOCK_SIZE:
-            self.flush()
-            new_size = data_length
-        self._buffer.write(data)
-        self._buffer_size = new_size

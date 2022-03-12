@@ -37,9 +37,10 @@ from ._bam import (
     BAM_CEQUAL,
     BAM_CDIFF,
     BAM_CBACK,
+    BamBlockBuffer as _BamBlockBuffer,
 )
 
-from .bgzf import BGZFReader, BGZFWriter
+from .bgzf import BGZFReader, BGZFWriter, BGZF_BLOCK_SIZE
 
 
 class CigarOp(enum.IntEnum):
@@ -196,12 +197,14 @@ class BamReader:
 
 
 class BamWriter:
-    def __init__(self, filename: str, header: BamHeader):
-        self._file = BGZFWriter(filename)
+    def __init__(self, filename: str, header: BamHeader, compresslevel=None):
+        self._file = BGZFWriter(filename, compresslevel)
         self.header = header
         self._write_header()
+        self._buffer = _BamBlockBuffer(BGZF_BLOCK_SIZE)
 
     def close(self):
+        self.flush()
         self._file.close()
 
     def __enter__(self):
@@ -212,6 +215,19 @@ class BamWriter:
 
     def _write_header(self):
         self._file.write(self.header.to_bytes())
+        self._file.flush()
+
+    def flush(self):
+        self._file.write_block(self._buffer.get_block_view())
+        self._buffer.reset()
 
     def write(self, bam_record: BamRecord):
-        self._file.write_block(bam_record.to_bytes())
+        if not self._buffer.write(bam_record):
+            # Returned 0, buffer is full.
+            self._file.write_block(self._buffer.get_block_view())
+            self._buffer.reset()
+            if not self._buffer.write(bam_record):
+                # BamRecord to big for single block. Distribute over multiple
+                # blocks.
+                self._file.write(bam_record.to_bytes())
+                self._file.flush()
