@@ -78,6 +78,25 @@ static PyGetSetDef BamCigar_properties[] = {
     {NULL},
 };
 
+static PyObject *
+BamCigar_richcompare(BamCigar *self, BamCigar *other, int op) {
+    switch (op) {
+        case Py_EQ:
+        case Py_NE:
+            if (Py_TYPE(other) != &BamCigar_Type) {
+                if (op == Py_EQ) {
+                    Py_RETURN_FALSE;
+                }
+                else {
+                    Py_RETURN_TRUE;
+                }
+            }
+            return PyObject_RichCompare(self->raw, other->raw, op);
+        default:
+            Py_RETURN_NOTIMPLEMENTED;
+    }
+}
+
 PyDoc_STRVAR(BamCigar_from_iter__doc__,
 "from_iter($cls, cigartuples, /)\n"
 "--\n"
@@ -383,6 +402,7 @@ static PyTypeObject BamCigar_Type = {
     .tp_getset = BamCigar_properties,
     .tp_new = PyType_GenericNew,
     .tp_iter = (getiterfunc)BamCigar__iter__,
+    .tp_richcompare = (richcmpfunc)BamCigar_richcompare,
 };
 
 typedef struct {
