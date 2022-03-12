@@ -97,6 +97,41 @@ BamCigar_richcompare(BamCigar *self, BamCigar *other, int op) {
     }
 }
 
+static int 
+BamCigar_get_buffer(BamCigar *self, Py_buffer *view, int flags) {
+    // Code adapted from PyBuffer_FillInfo as it is nearly the same.
+    // Python bytes objects do this too.
+    if ((flags & PyBUF_WRITABLE) == PyBUF_WRITABLE) {
+        PyErr_SetString(PyExc_BufferError,
+                        "BamCigar is not writable.");
+       return -1;         
+    }
+    Py_INCREF(self);
+    view->obj = (PyObject *)self;
+    view->buf = (void *)self->cigar;
+    view->len = sizeof(uint32_t) * self->n_cigar_op;
+    view->readonly = 1;
+    view->itemsize = sizeof(uint32_t);
+    view->format = NULL;
+    if ((flags & PyBUF_FORMAT) == PyBUF_FORMAT)
+        view->format = "I";
+    view->ndim = 1;
+    view->shape = NULL;
+    if ((flags & PyBUF_ND) == PyBUF_ND)
+        view->shape = &(self->n_cigar_op);
+    view->strides = NULL;
+    if ((flags & PyBUF_STRIDES) == PyBUF_STRIDES)
+        view->strides = &(view->itemsize);
+    view->suboffsets = NULL;
+    view->internal = NULL;
+    return 0;
+}
+
+static PyBufferProcs BamCigar_as_buffer = {
+    .bf_getbuffer = (getbufferproc)BamCigar_get_buffer,
+    .bf_releasebuffer = NULL, // Buffer does not use resources
+};
+
 PyDoc_STRVAR(BamCigar_from_iter__doc__,
 "from_iter($cls, cigartuples, /)\n"
 "--\n"
@@ -403,6 +438,7 @@ static PyTypeObject BamCigar_Type = {
     .tp_new = PyType_GenericNew,
     .tp_iter = (getiterfunc)BamCigar__iter__,
     .tp_richcompare = (richcmpfunc)BamCigar_richcompare,
+    .tp_as_buffer = &BamCigar_as_buffer,
 };
 
 typedef struct {

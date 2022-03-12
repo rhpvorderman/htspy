@@ -87,7 +87,7 @@ def test_bam_cigar_buffer():
     assert view.itemsize == 4
     assert view.tolist() == CIGAR_NUMBER_LIST
     assert view.obj is bam_cigar
-    assert len(view) == 9
+    assert len(view) == len(CIGAR_NUMBER_LIST)
     assert view[0] == CIGAR_NUMBER_LIST[0]
     assert view[8] == CIGAR_NUMBER_LIST[8]
 
