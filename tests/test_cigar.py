@@ -69,7 +69,7 @@ def test_bam_cigar___init__():
     assert bam_cigar.number_of_operations == len(CIGAR_TUPLES)
 
 
-def test_bam_cigar__str__(bam_cigar):
+def test_bam_cigar__str__():
     assert str(BamCigar(CIGAR_STRING)) == CIGAR_STRING
 
 
@@ -77,7 +77,7 @@ def test_bam_cigar_to_tuples():
     assert list(BamCigar(CIGAR_STRING)) == CIGAR_TUPLES
 
 
-def test_bam_cigar_buffer(bam_cigar):
+def test_bam_cigar_buffer():
     bam_cigar = BamCigar(CIGAR_STRING)
     view = memoryview(bam_cigar)
     assert view.tobytes() == bam_cigar.raw
@@ -92,23 +92,19 @@ def test_bam_cigar_buffer(bam_cigar):
     assert view[8] == CIGAR_NUMBER_LIST[8]
 
 
-def test_bam_cigar_from_bytes(bam_cigar):
+def test_bam_cigar_from_bytes():
+    bam_cigar = BamCigar(CIGAR_STRING)
     assert BamCigar.from_bytes(bam_cigar.raw) == bam_cigar
 
 
-def test_bam_cigar_from_bytes_error(bam_cigar):
+def test_bam_cigar_from_bytes_error():
+    bam_cigar = BamCigar(CIGAR_STRING)
     with pytest.raises(ValueError) as error:
         BamCigar.from_bytes(bam_cigar.raw + b"12")
-    error.match("bytes length not a multiple of 4")
+    error.match('Size of b must be a multiple of 4')
 
 
-def test_bam_cigar_from_buffer(bam_cigar):
+def test_bam_cigar_from_buffer():
+    bam_cigar = BamCigar(CIGAR_STRING)
     cigar_array = array.array("I", CIGAR_NUMBER_LIST)
     assert BamCigar.from_buffer(cigar_array) == bam_cigar
-
-
-def test_bam_cigar_from_buffer_incompatible_format(bam_cigar):
-    cigar_array = array.array("i", CIGAR_NUMBER_LIST[:8])
-    with pytest.raises(BufferError) as error:
-        BamCigar.from_buffer(cigar_array)
-    error.match("Invalid buffer format, expected: 'I', got: 'i'")
