@@ -132,6 +132,52 @@ static PyBufferProcs BamCigar_as_buffer = {
     .bf_releasebuffer = NULL, // Buffer does not use resources
 };
 
+static PyObject * 
+BamCigar__str__(BamCigar *self) {
+    // Largest cigar op length is 9 digits (268435455). So 9 digits plus 1 
+    // op character == 10 characters per cigar op. Assigning max_size memory
+    // has the disadvantage that we probably assign way too much memory, but
+    // at the advantage that sprintf can never overshoot, so there is no need
+    // to check, and the memory never has to be resized.
+    Py_ssize_t n_cigar_op = self->n_cigar_op;
+    uint32_t * cigar = self->cigar;
+    size_t max_size = self->n_cigar_op * 10;
+    char * buffer = PyMem_Malloc(max_size);
+    if (buffer == NULL) {
+        return PyErr_NoMemory();
+    }
+    uint32_t cigar_int;
+    Py_ssize_t string_size = 0;
+    Py_ssize_t i = 0;
+    while (i < n_cigar_op) {
+        cigar_int = cigar[i];
+        // No snprintf, because overshoot is impossible.
+        string_size += sprintf(buffer + string_size, "%d%c", 
+                               bam_cigar_oplen(cigar_int), 
+                               bam_cigar_opchr(cigar_int));
+        i += 1;
+    }
+    // PyUnicode_New is faster than PyUnicode_DecodeASCII, since we do not need
+    // to check for ASCII. The above code can never contain non-ASCII characters.
+    // This trick was learned from Marcel Martin. Thanks!
+    PyObject * retval = PyUnicode_New(string_size, 127);
+    if (retval == NULL) {
+        PyMem_Free(buffer);
+        return PyErr_NoMemory();
+    }
+    memcpy(PyUnicode_1BYTE_DATA(retval), buffer, string_size);
+    return retval;
+}
+
+static PyObject *
+BamCigar__repr__(BamCigar * self){
+    PyObject * cigarstring = BamCigar__str__(self);
+    if (cigarstring == NULL){
+        return NULL;
+    }
+    return PyUnicode_FromFormat("BamCigar(%R)", cigarstring);
+}
+
 PyDoc_STRVAR(BamCigar_from_iter__doc__,
 "from_iter($cls, cigartuples, /)\n"
 "--\n"
@@ -439,6 +485,8 @@ static PyTypeObject BamCigar_Type = {
     .tp_iter = (getiterfunc)BamCigar__iter__,
     .tp_richcompare = (richcmpfunc)BamCigar_richcompare,
     .tp_as_buffer = &BamCigar_as_buffer,
+    .tp_str = (reprfunc)BamCigar__str__,
+    .tp_repr = (reprfunc)BamCigar__repr__,
 };
 
 typedef struct {
