@@ -102,14 +102,13 @@ BamCigar_from_iter(PyTypeObject *type, PyObject *cigartuples_in) {
         Py_DECREF(cigartuples);
         return PyErr_NoMemory();
     }
-    uint32_t * voffset_array = (uint32_t *)PyBytes_AS_STRING(raw);
+    uint32_t * cigar = (uint32_t *)PyBytes_AS_STRING(raw);
     Py_ssize_t i = 0;
     PyObject * tup;
     PyObject * operation; 
     PyObject * count; 
     Py_ssize_t operation_i;
     Py_ssize_t count_i;
-    uint32_t voffset;
     
     while (i < n_cigar_op) {
         tup = PySequence_Fast_GET_ITEM(cigartuples, i);
@@ -160,8 +159,7 @@ BamCigar_from_iter(PyTypeObject *type, PyObject *cigartuples_in) {
                 "Got %ld for cigartuple: %R",
                 BAM_CIGAR_MAX_COUNT, count_i, tup);
         }
-        voffset = (count_i << 4) | operation_i;
-        voffset_array[i] = voffset;
+        cigar[i] = bam_cigar_gen(count_i, operation_i);
         i += 1;
     }
     Py_DECREF(cigartuples);
@@ -296,7 +294,7 @@ BamCigar__init__(BamCigar *self, PyObject *args, PyObject *kwargs) {
                 endptr[0]);
             Py_DECREF(raw); return -1;
         }
-        cigar[i] = (count << 4) | operation;
+        cigar[i] = bam_cigar_gen(count, operation);
         i += 1;
         cursor = endptr + 1;
     }
