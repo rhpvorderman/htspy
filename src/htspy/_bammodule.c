@@ -168,6 +168,7 @@ BamCigar__str__(BamCigar *self) {
         return PyErr_NoMemory();
     }
     memcpy(PyUnicode_1BYTE_DATA(retval), buffer, string_size);
+    PyMem_Free(buffer);
     return retval;
 }
 
