@@ -46,10 +46,11 @@ BamCigar_dealloc(BamCigar *self) {
 }
 
 /**
- * @brief Creates a new BamCigar without checks. For internal calls only. Steals a reference.
+ * @brief Creates a new BamCigar without checks. For internal calls only. 
+ *        Steals a reference to the bytes object.
  *
  * @param bytes a PyBytesObject (not checked, reference stealed.)
- * @param n_cigar_op (number of cigar units. Not checked with length of Bytes object.)
+ * @param n_cigar_op number of cigar units. Not checked with length of Bytes object.
  * @return PyObject*
  */
 static PyObject *
@@ -191,7 +192,9 @@ PyDoc_STRVAR(BamCigar_from_iter__doc__,
     {"from_iter", (PyCFunction)(void(*)(void))BamCigar_from_iter, \
     METH_O | METH_CLASS, BamCigar_from_iter__doc__}
 
-#define BAMCIGAR_FROM_ITER_ERROR_EXIT Py_DECREF(cigartuples);Py_DECREF(raw); return NULL;
+#define BAMCIGAR_FROM_ITER_ERROR_EXIT \
+    Py_DECREF(cigartuples);Py_DECREF(raw); return NULL;
+
 static PyObject *
 BamCigar_from_iter(PyTypeObject *type, PyObject *cigartuples_in) {
     PyObject * cigartuples = PySequence_Fast(
@@ -200,7 +203,8 @@ BamCigar_from_iter(PyTypeObject *type, PyObject *cigartuples_in) {
         return NULL;
     }
     Py_ssize_t n_cigar_op = PySequence_Fast_GET_SIZE(cigartuples);
-    PyObject * raw = PyBytes_FromStringAndSize(NULL, n_cigar_op * sizeof(uint32_t));
+    PyObject * raw = PyBytes_FromStringAndSize(
+                        NULL, n_cigar_op * sizeof(uint32_t));
     if (raw == NULL){
         Py_DECREF(cigartuples);
         return PyErr_NoMemory();
@@ -361,7 +365,8 @@ BamCigar__init__(BamCigar *self, PyObject *args, PyObject *kwargs) {
     // uint32_t is 4 bytes. A string needs at least 2 characters to encode a
     // a cigarop + count. So maximum number of cigarops is string_size / 2.
     Py_ssize_t maximum_cigar_op = string_size / 2;
-    PyObject * raw = PyBytes_FromStringAndSize(NULL, maximum_cigar_op * sizeof(uint32_t));
+    PyObject * raw = PyBytes_FromStringAndSize(
+                        NULL, maximum_cigar_op * sizeof(uint32_t));
     if (raw == NULL) {
         PyErr_NoMemory();
         return -1;
@@ -956,7 +961,8 @@ PyDoc_STRVAR(BamBlockBuffer_write_doc,
     {"write", (PyCFunction)(void(*)(void))BamBlockBuffer_write, METH_O, \
      BamBlockBuffer_write_doc}
 
-static PyObject * BamBlockBuffer_write(BamBlockBuffer * self, BamRecord * bam_record) {
+static PyObject * 
+BamBlockBuffer_write(BamBlockBuffer * self, BamRecord * bam_record) {
     if (Py_TYPE(bam_record) != &BamRecord_Type) {
         PyErr_Format(PyExc_TypeError, "Type must be BamRecord, got: %s",
                      Py_TYPE(bam_record)->tp_name);
