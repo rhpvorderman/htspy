@@ -738,6 +738,45 @@ BamRecord_set_tags(BamRecord * self, PyObject * new_tags, void* closure)
     return 0;
 }
 
+PyDoc_STRVAR(BamRecord_cigar_doc, 
+"A BamCigar object representing the CIGAR information.");
+
+static PyObject *
+BamRecord_get_cigar(BamRecord * self, void * closure) {
+    if (self->n_cigar_op == 2) {
+        // Initiate CG tag check
+        uint32_t * cigar = (uint32_t)PyBytes_AS_STRING(self->cigar);
+        if ((bam_cigar_op(cigar[0]) == BAM_CSOFT_CLIP) && 
+            (bam_cigar_oplen(cigar[0]) == self->l_seq)) {
+                PyErr_SetString(PyExc_NotImplementedError, 
+                    "Support for cigars longer than 65536 has not yet been implemented.");
+                return NULL;
+            }
+    }
+    Py_INCREF(self->cigar);
+    return BamCigar_FromBytesAndSize(self->cigar, self->n_cigar_op);
+}
+
+static int 
+BamRecord_set_cigar(BamRecord * self, BamCigar * new_cigar, void * closure) {
+    if (Py_TYPE(new_cigar) != &BamCigar_Type) {
+        PyErr_Format(PyExc_TypeError, "cigar must be of BamCigar type, got %s.",
+            Py_TYPE(new_cigar)->tp_name);
+        return -1; 
+    }
+    if (new_cigar->n_cigar_op > 65536) {
+        PyErr_SetString(PyExc_NotImplementedError, 
+            "Support for cigars longer than 65536 has not yet been implemented.");
+        return -1;
+    }
+    PyObject * tmp = self->cigar;
+    Py_INCREF(new_cigar->raw);
+    self->cigar = new_cigar->raw;
+    self->n_cigar_op = new_cigar->n_cigar_op;
+    Py_DECREF(tmp);
+    return 0;
+}
+
 // Flags 
 #define GET_FLAG_PROP(prop_name, FLAG) \
 static PyObject * \
@@ -800,6 +839,8 @@ static PyGetSetDef BamRecord_properties[] = {
      BamRecord_read_name_doc, NULL},
     {"tags", (getter)BamRecord_get_tags, (setter)BamRecord_set_tags,
      BamRecord_tags_doc, NULL},
+    {"cigar", (getter)BamRecord_get_cigar, (setter)BamRecord_set_cigar,
+     BamRecord_cigar_doc, NULL},
     {"is_paired", (getter)BamRecord_is_paired, NULL, 
      BamRecord_is_paired_doc, NULL},
     {"is_proper_pair", (getter)BamRecord_is_proper_pair, NULL, 
