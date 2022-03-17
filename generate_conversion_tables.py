@@ -23,7 +23,7 @@ def main():
             if i % 16 == 0 and i != 0:
                 out.write(f" // {(i // 16 - 1) * 16}-{i - 1}\n    ")
             out.write(literal.rjust(2, " ") + ", ")
-        out.write(f" // {(i // 16 - 1) * 16}-{i - 1}\n")
+        out.write(f" // {(i // 16) * 16}-{i}\n")
         out.write("};\n")
 
 
