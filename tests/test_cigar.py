@@ -80,8 +80,6 @@ def test_bam_cigar_to_tuples():
 def test_bam_cigar_buffer():
     bam_cigar = Cigar(CIGAR_STRING)
     view = memoryview(bam_cigar)
-    assert view.tobytes() == bam_cigar.raw
-    assert view.nbytes == len(bam_cigar.raw)
     assert view.ndim == 1
     assert view.format == "I"
     assert view.itemsize == 4
@@ -94,14 +92,14 @@ def test_bam_cigar_buffer():
 
 def test_bam_cigar_from_bytes():
     bam_cigar = Cigar(CIGAR_STRING)
-    assert Cigar.from_bytes(bam_cigar.raw) == bam_cigar
+    assert Cigar.from_buffer(bytes(bam_cigar)) == bam_cigar
 
 
 def test_bam_cigar_from_bytes_error():
     bam_cigar = Cigar(CIGAR_STRING)
     with pytest.raises(ValueError) as error:
-        Cigar.from_bytes(bam_cigar.raw + b"12")
-    error.match('Size of b must be a multiple of 4')
+        Cigar.from_buffer(bytes(bam_cigar) + b"12")
+    error.match('not a multiple of 4')
 
 
 def test_bam_cigar_from_buffer():

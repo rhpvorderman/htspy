@@ -24,6 +24,15 @@
 
 #include "_conversions.h"
 
+#if (PY_VERSION_HEX > 0x03090000)
+    #define PyObject_SET_REFCOUNT(op, count) Py_SET_REFCNT(op, count)
+    #define BamCigar_SET_SIZE(op, size) Py_SET_SIZE(op, size)
+    #define BamCigar_SET_TYPE(op) Py_SET_TYPE(op, &BamCigar_Type)
+#else 
+    #define PyObject_SET_REFCOUNT(op, count) Py_REFCNT(op) = count
+    #define BamCigar_SET_SIZE(op, size) Py_SIZE(op) = count
+    #define BamCigar_SET_TYPE(op) Py_TYPE(op) = &BamCigar_Type
+#endif
 #define BAM_CIGAR_MAX_COUNT 0xFFFFFFF
 #define BAM_CIGAR_MAX_OP 9
 
@@ -58,9 +67,9 @@ BamCigar_FromPointerAndSize(uint32_t * cigar_ptr, Py_ssize_t n_cigar_op) {
     if (obj == NULL) {
         return PyErr_NoMemory();
     }
-    Py_REFCNT(obj) = 1;
-    Py_TYPE(obj) = &BamCigar_Type;
-    Py_SET_SIZE(obj, n_cigar_op);
+    PyObject_SET_REFCOUNT(obj, 1);
+    BamCigar_SET_TYPE(obj);
+    BamCigar_SET_SIZE(obj, n_cigar_op);
     if (cigar_ptr != NULL) {
         memcpy(obj->cigar, cigar_ptr, size);
     }
@@ -71,11 +80,11 @@ static int
 _BamCigar_Resize(PyObject **obj, Py_ssize_t new_n_cigar_op) {
     PyObject * orig_obj = *obj;
     size_t new_size = new_n_cigar_op * sizeof(uint32_t);
-    if (new_n_cigar_op < 0 || Py_REFCNT(obj) != 1) {
+    if (new_n_cigar_op < 0 || Py_REFCNT(orig_obj) != 1) {
         PyErr_BadInternalCall();
         return -1;
     }
-    if (Py_SIZE(obj) == new_n_cigar_op) {
+    if (Py_SIZE(orig_obj) == new_n_cigar_op) {
         return 0;
     }
     if (new_n_cigar_op == 0){
@@ -89,7 +98,7 @@ _BamCigar_Resize(PyObject **obj, Py_ssize_t new_n_cigar_op) {
         PyErr_NoMemory();
         return -1;
     }
-    Py_SET_SIZE(obj, new_n_cigar_op);
+    BamCigar_SET_SIZE(*obj, new_n_cigar_op);
     return 0;
 }
 
