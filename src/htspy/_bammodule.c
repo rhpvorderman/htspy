@@ -113,19 +113,25 @@ static PyGetSetDef BamCigar_properties[] = {
     {NULL},
 };
 
+static inline int
+BamCigar_equals(BamCigar *self, BamCigar *other) {
+    if (Py_TYPE(other) != &BamCigar_Type) {
+        return 0;
+    }
+    if (Py_SIZE(self) != Py_SIZE(other)) {
+        return 0;
+    }
+    Py_ssize_t size = Py_SIZE(self) * sizeof(uint32_t);
+    return (memcmp(self->cigar, other->cigar, size) == 0);
+}
+
 static PyObject *
 BamCigar_richcompare(BamCigar *self, BamCigar *other, int op) {
     switch (op) {
         case Py_EQ:
-            if (Py_TYPE(other) != &BamCigar_Type) {
-                Py_RETURN_FALSE;
-            }
-            if (Py_SIZE(self) != Py_SIZE(other)) {
-                Py_RETURN_FALSE;
-            }
-            return PyBool_FromLong(
-                    memcmp(self->cigar, other->cigar, 
-                           Py_SIZE(self) * sizeof(uint32_t)) == 0);
+           return PyBool_FromLong(BamCigar_equals(self, other));
+        case Py_NE:
+            return PyBool_FromLong(!BamCigar_equals(self, other));
         default:
             Py_RETURN_NOTIMPLEMENTED;
     }

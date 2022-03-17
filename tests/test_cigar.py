@@ -106,3 +106,8 @@ def test_bam_cigar_from_buffer():
     bam_cigar = Cigar(CIGAR_STRING)
     cigar_array = array.array("I", CIGAR_NUMBER_LIST)
     assert Cigar.from_buffer(cigar_array) == bam_cigar
+
+
+def test_bam_cigar_richcompare():
+    assert Cigar("8M") == Cigar("8M")
+    assert Cigar("8M") != Cigar("7M")
