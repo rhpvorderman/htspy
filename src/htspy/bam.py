@@ -23,23 +23,23 @@ import struct
 import typing
 from typing import Dict, Iterator, List, Tuple
 
-from ._bam import (
-    BamRecord,
-    bam_iterator,
-    Cigar,
-    BAM_CMATCH,
-    BAM_CINS,
+# Cigar is part of the API even if not used here.
+from ._bam import (  # noqa: F401
+    BAM_CBACK,
     BAM_CDEL,
+    BAM_CDIFF,
+    BAM_CEQUAL,
+    BAM_CHARD_CLIP,
+    BAM_CINS,
+    BAM_CMATCH,
+    BAM_CPAD,
     BAM_CREF_SKIP,
     BAM_CSOFT_CLIP,
-    BAM_CHARD_CLIP,
-    BAM_CPAD,
-    BAM_CEQUAL,
-    BAM_CDIFF,
-    BAM_CBACK,
     BamBlockBuffer as _BamBlockBuffer,
+    BamRecord,
+    Cigar,
+    bam_iterator,
 )
-
 from .bgzf import BGZFReader, BGZFWriter, BGZF_BLOCK_SIZE
 
 
