@@ -472,6 +472,7 @@ static PyTypeObject BamCigar_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
     .tp_name = "_bam.Cigar",
     .tp_basicsize = sizeof(BamCigar),
+    .tp_itemsize = sizeof(uint32_t),
     .tp_dealloc = (destructor)BamCigar_dealloc,
     .tp_doc = BamCigar_init__doc__,
     .tp_methods = BamCigar_methods,
