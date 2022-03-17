@@ -21,11 +21,481 @@
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include "structmember.h"         // PyMemberDef
-#include <stdint.h>
 
-#include "htslib/sam.h"
+#include "_conversions.h"
+
+#define BAM_CIGAR_MAX_COUNT 0xFFFFFFF
+#define BAM_CIGAR_MAX_OP 9
 
 #define BGZF_BLOCK_SIZE 0xff00  // From bgzf.h
+
+typedef struct {
+    PyObject_HEAD
+    PyObject * raw;
+    uint32_t * cigar;
+    Py_ssize_t n_cigar_op;
+
+} BamCigar;
+
+static PyTypeObject BamCigar_Type;  // Forward declaration
+
+static void
+BamCigar_dealloc(BamCigar *self) {
+    Py_CLEAR(self->raw);
+    Py_TYPE(self)->tp_free((PyObject *)self);
+}
+
+/**
+ * @brief Creates a new BamCigar without checks. For internal calls only. 
+ *        Steals a reference to the bytes object.
+ *
+ * @param bytes a PyBytesObject (not checked, reference stealed.)
+ * @param n_cigar_op number of cigar units. Not checked with length of Bytes object.
+ * @return PyObject*
+ */
+static PyObject *
+BamCigar_FromBytesAndSize(PyObject * bytes, Py_ssize_t n_cigar_op) {
+    BamCigar *cigar = PyObject_New(BamCigar, &BamCigar_Type);
+    cigar->raw = bytes;
+    cigar->cigar = (uint32_t *)PyBytes_AS_STRING(bytes);
+    cigar->n_cigar_op = n_cigar_op;
+    return (PyObject *)cigar;
+}
+
+static PyObject *
+BamCigar_raw(BamCigar *self, void *closure){
+    Py_INCREF(self->raw);
+    return self->raw;
+}
+
+static PyObject *
+BamCigar_number_of_operations(BamCigar *self, void *closure){
+    return PyLong_FromSsize_t(self->n_cigar_op);
+}
+
+static PyGetSetDef BamCigar_properties[] = {
+    {"raw", (getter)BamCigar_raw, NULL,
+    "The underlying bytes object with the cigar array.", NULL},
+    {"number_of_operations", (getter)BamCigar_number_of_operations, NULL,
+    "The number of CIGAR operations (n_cigar_op).", NULL},
+    {NULL},
+};
+
+static PyObject *
+BamCigar_richcompare(BamCigar *self, BamCigar *other, int op) {
+    switch (op) {
+        case Py_EQ:
+        case Py_NE:
+            if (Py_TYPE(other) != &BamCigar_Type) {
+                if (op == Py_EQ) {
+                    Py_RETURN_FALSE;
+                }
+                else {
+                    Py_RETURN_TRUE;
+                }
+            }
+            return PyObject_RichCompare(self->raw, other->raw, op);
+        default:
+            Py_RETURN_NOTIMPLEMENTED;
+    }
+}
+
+static int
+BamCigar_get_buffer(BamCigar *self, Py_buffer *view, int flags) {
+    // Code adapted from PyBuffer_FillInfo as it is nearly the same.
+    // Python bytes objects do this too.
+    if ((flags & PyBUF_WRITABLE) == PyBUF_WRITABLE) {
+        PyErr_SetString(PyExc_BufferError,
+                        "BamCigar is not writable.");
+       return -1;
+    }
+    Py_INCREF(self);
+    view->obj = (PyObject *)self;
+    view->buf = (void *)self->cigar;
+    view->len = sizeof(uint32_t) * self->n_cigar_op;
+    view->readonly = 1;
+    view->itemsize = sizeof(uint32_t);
+    view->format = NULL;
+    if ((flags & PyBUF_FORMAT) == PyBUF_FORMAT)
+        view->format = "I";
+    view->ndim = 1;
+    view->shape = NULL;
+    if ((flags & PyBUF_ND) == PyBUF_ND)
+        view->shape = &(self->n_cigar_op);
+    view->strides = NULL;
+    if ((flags & PyBUF_STRIDES) == PyBUF_STRIDES)
+        view->strides = &(view->itemsize);
+    view->suboffsets = NULL;
+    view->internal = NULL;
+    return 0;
+}
+
+static PyBufferProcs BamCigar_as_buffer = {
+    .bf_getbuffer = (getbufferproc)BamCigar_get_buffer,
+    .bf_releasebuffer = NULL, // Buffer does not use resources
+};
+
+static PyObject *
+BamCigar__str__(BamCigar *self) {
+    // Largest cigar op length is 9 digits (268435455). So 9 digits plus 1
+    // op character == 10 characters per cigar op. Assigning max_size memory
+    // has the disadvantage that we probably assign way too much memory, but
+    // at the advantage that sprintf can never overshoot, so there is no need
+    // to check, and the memory never has to be resized.
+    Py_ssize_t n_cigar_op = self->n_cigar_op;
+    uint32_t * cigar = self->cigar;
+    size_t max_size = self->n_cigar_op * 10;
+    char * buffer = PyMem_Malloc(max_size);
+    if (buffer == NULL) {
+        return PyErr_NoMemory();
+    }
+    uint32_t cigar_int;
+    Py_ssize_t string_size = 0;
+    Py_ssize_t i = 0;
+    while (i < n_cigar_op) {
+        cigar_int = cigar[i];
+        // No snprintf, because overshoot is impossible.
+        string_size += sprintf(buffer + string_size, "%d%c",
+                               bam_cigar_oplen(cigar_int),
+                               bam_cigar_opchr(cigar_int));
+        i += 1;
+    }
+    // PyUnicode_New is faster than PyUnicode_DecodeASCII, since we do not need
+    // to check for ASCII. The above code can never contain non-ASCII characters.
+    // This trick was learned from Marcel Martin. Thanks!
+    PyObject * retval = PyUnicode_New(string_size, 127);
+    if (retval == NULL) {
+        PyMem_Free(buffer);
+        return PyErr_NoMemory();
+    }
+    memcpy(PyUnicode_1BYTE_DATA(retval), buffer, string_size);
+    PyMem_Free(buffer);
+    return retval;
+}
+
+static PyObject *
+BamCigar__repr__(BamCigar * self){
+    PyObject * cigarstring = BamCigar__str__(self);
+    if (cigarstring == NULL){
+        return NULL;
+    }
+    return PyUnicode_FromFormat("Cigar(%R)", cigarstring);
+}
+
+PyDoc_STRVAR(BamCigar_from_iter__doc__,
+"from_iter($cls, cigartuples, /)\n"
+"--\n"
+"\n"
+"Create a new BamCigar from an iterable of (operation, count) tuples.\n"
+);
+#define BAM_CIGAR_FROM_ITER_METHODDEF    \
+    {"from_iter", (PyCFunction)(void(*)(void))BamCigar_from_iter, \
+    METH_O | METH_CLASS, BamCigar_from_iter__doc__}
+
+#define BAMCIGAR_FROM_ITER_ERROR_EXIT \
+    Py_DECREF(cigartuples);Py_DECREF(raw); return NULL;
+
+static PyObject *
+BamCigar_from_iter(PyTypeObject *type, PyObject *cigartuples_in) {
+    PyObject * cigartuples = PySequence_Fast(
+        cigartuples_in, "cigartuples must be an iterable");
+    if (cigartuples == NULL){
+        return NULL;
+    }
+    Py_ssize_t n_cigar_op = PySequence_Fast_GET_SIZE(cigartuples);
+    PyObject * raw = PyBytes_FromStringAndSize(
+                        NULL, n_cigar_op * sizeof(uint32_t));
+    if (raw == NULL){
+        Py_DECREF(cigartuples);
+        return PyErr_NoMemory();
+    }
+    uint32_t * cigar = (uint32_t *)PyBytes_AS_STRING(raw);
+    Py_ssize_t i = 0;
+    PyObject * tup;
+    PyObject * operation;
+    PyObject * count;
+    Py_ssize_t operation_i;
+    Py_ssize_t count_i;
+
+    while (i < n_cigar_op) {
+        tup = PySequence_Fast_GET_ITEM(cigartuples, i);
+        if (!PyTuple_CheckExact(tup)) {
+            PyErr_Format(PyExc_TypeError,
+                         "List should only consist of tuples got '%s' for "
+                         "item: %R",
+                         Py_TYPE(tup)->tp_name, tup);
+            BAMCIGAR_FROM_ITER_ERROR_EXIT
+        }
+        if (PyTuple_GET_SIZE(tup) != 2) {
+            PyErr_Format(PyExc_ValueError,
+                         "Tuples should consist of 2 items got '%ld' for "
+                         "item: %r",
+                          PyTuple_GET_SIZE(tup), tup);
+            BAMCIGAR_FROM_ITER_ERROR_EXIT
+        }
+        operation = PyTuple_GET_ITEM(tup, 0);
+        count = PyTuple_GET_ITEM(tup, 1);
+        if (!PyLong_CheckExact(operation)) {
+              PyErr_Format(PyExc_TypeError,
+                           "Operation should be of type int, got '%s' for "
+                           "cigartuple: %R",
+                           Py_TYPE(operation)->tp_name, tup);
+            BAMCIGAR_FROM_ITER_ERROR_EXIT
+        }
+        if (!PyLong_CheckExact(count)) {
+              PyErr_Format(PyExc_TypeError,
+                           "Count should be of type int, got '%s' for "
+                           "cigartuple: %R",
+                           Py_TYPE(count)->tp_name, tup);
+            BAMCIGAR_FROM_ITER_ERROR_EXIT
+        }
+        operation_i = PyLong_AsSsize_t(operation);
+        count_i = PyLong_AsSsize_t(count);
+        if ((operation_i > BAM_CIGAR_MAX_OP) || (operation_i < 0)){
+            PyErr_Format(
+                PyExc_ValueError,
+                "Operation should be between 0 and %d. "
+                "Got %ld for cigartuple: %R",
+                BAM_CIGAR_MAX_OP, operation_i, tup);
+            BAMCIGAR_FROM_ITER_ERROR_EXIT
+        }
+        if ((count_i > BAM_CIGAR_MAX_COUNT) || (count_i < 0)) {
+            PyErr_Format(
+                PyExc_ValueError,
+                "Count should be between 0 and %d. "
+                "Got %ld for cigartuple: %R",
+                BAM_CIGAR_MAX_COUNT, count_i, tup);
+        }
+        cigar[i] = bam_cigar_gen(count_i, operation_i);
+        i += 1;
+    }
+    Py_DECREF(cigartuples);
+    return BamCigar_FromBytesAndSize(raw, n_cigar_op);
+}
+
+PyDoc_STRVAR(BamCigar_from_bytes__doc__,
+"from_bytes($cls, b, /)\n"
+"--\n"
+"\n"
+"Create a new BamCigar from a bytes object b.\n"
+"\n"
+"This is the fastest method, as the bytes object is referenced internally\n"
+"instead of being copied."
+);
+#define BAM_CIGAR_FROM_BYTES_METHODDEF    \
+    {"from_bytes", (PyCFunction)(void(*)(void))BamCigar_from_bytes, \
+    METH_O | METH_CLASS, BamCigar_from_bytes__doc__}
+
+static PyObject *
+BamCigar_from_bytes(PyTypeObject *type, PyObject *b) {
+    if (!PyBytes_CheckExact(b)){
+        PyErr_Format(PyExc_TypeError, "b must be a bytes object, got %s.",
+                     Py_TYPE(b)->tp_name);
+        return NULL;
+    }
+    Py_ssize_t size = PyBytes_GET_SIZE(b);
+    if (size % 4){
+        PyErr_SetString(PyExc_ValueError, "Size of b must be a multiple of 4");
+        return NULL;
+    }
+    Py_INCREF(b);
+    return BamCigar_FromBytesAndSize(b, size / 4);
+}
+
+PyDoc_STRVAR(BamCigar_from_buffer__doc__,
+"from_buffer($cls, data, /)\n"
+"--\n"
+"\n"
+"Create a new BamCigar from an object that supports the buffer protocol.\n"
+"\n"
+"Objects that support the buffer protocol include bytes, bytesarray, array.array,\n"
+"numpy arrays and others."
+);
+
+#define BAM_CIGAR_FROM_BUFFER_METHODDEF    \
+    {"from_buffer", (PyCFunction)(void(*)(void))BamCigar_from_buffer, \
+    METH_O | METH_CLASS, BamCigar_from_buffer__doc__}
+
+static PyObject *
+BamCigar_from_buffer(PyTypeObject *type, PyObject *data) {
+    Py_buffer buffer;
+    if (PyObject_GetBuffer(data, &buffer, PyBUF_SIMPLE) != 0) {
+        return NULL;
+    }
+    if (buffer.len % 4) {
+        PyErr_SetString(PyExc_ValueError,
+            "buffer length not a multiple of 4");
+        return NULL;
+    }
+    PyObject * raw = PyBytes_FromStringAndSize((char *)buffer.buf, buffer.len);
+    return BamCigar_FromBytesAndSize(raw, buffer.len / 4);
+}
+
+PyDoc_STRVAR(BamCigar_init__doc__,
+"__init__($cls, cigarstring, /)\n"
+"--\n"
+"\n"
+"Create a new BamCigar from a cigarstring.\n"
+);
+
+static int
+BamCigar__init__(BamCigar *self, PyObject *args, PyObject *kwargs) {
+    self->cigar = NULL;
+    self->raw = NULL;
+    PyObject * cigarstring = NULL;
+    char * keywords[] = {"", NULL};
+    const char *format = "O|:BamCigar.__init__";
+    if (!PyArg_ParseTupleAndKeywords(
+            args, kwargs, format, keywords, &cigarstring)) {
+        return -1;
+    }
+    if (!PyUnicode_CheckExact(cigarstring)) {
+        PyErr_Format(PyExc_TypeError, "cigarstring must be of type str, got %s",
+            Py_TYPE(cigarstring)->tp_name);
+        return -1;
+    }
+    if (!PyUnicode_IS_COMPACT_ASCII(cigarstring)) {
+        PyErr_SetString(PyExc_ValueError,
+            "cigarstring must be a valid ascii string");
+        return -1;
+    }
+    Py_ssize_t string_size = PyUnicode_GET_LENGTH(cigarstring);
+    char * cigar_string_ptr = (char *)PyUnicode_1BYTE_DATA(cigarstring);
+    char * cigar_string_end = cigar_string_ptr + string_size;
+    // uint32_t is 4 bytes. A string needs at least 2 characters to encode a
+    // a cigarop + count. So maximum number of cigarops is string_size / 2.
+    Py_ssize_t maximum_cigar_op = string_size / 2;
+    PyObject * raw = PyBytes_FromStringAndSize(
+                        NULL, maximum_cigar_op * sizeof(uint32_t));
+    if (raw == NULL) {
+        PyErr_NoMemory();
+        return -1;
+    }
+    uint32_t * cigar = (uint32_t *)PyBytes_AS_STRING(raw);
+    Py_ssize_t i = 0;
+    char * endptr = NULL;
+    long int count;
+    char operation;
+    char * cursor = cigar_string_ptr;
+    while (cursor < cigar_string_end){
+        count = strtol(cursor, &endptr, 10);
+        if ((count < 0)) {
+            PyErr_Format(PyExc_ValueError, "Invalid cigarstring: %R",
+                         cigarstring);
+            Py_DECREF(raw); return -1;
+        }
+        if ((count > BAM_CIGAR_MAX_COUNT)) {
+            PyErr_Format(
+                PyExc_ValueError, "Maximum count exceeded: %ld > %ld",
+                count, BAM_CIGAR_MAX_COUNT);
+            Py_DECREF(raw); return -1;
+        }
+        if (endptr >= cigar_string_end) {
+            PyErr_Format(
+                PyExc_ValueError, "Truncated cigarstring: %R",
+                    cigarstring);
+            Py_DECREF(raw); return -1;
+        }
+        operation = bam_cigar_table[(uint8_t)endptr[0]];
+        if (operation == -1) {
+            PyErr_Format(PyExc_ValueError, "Invalid cigar operation: '%c'",
+                endptr[0]);
+            Py_DECREF(raw); return -1;
+        }
+        cigar[i] = bam_cigar_gen(count, operation);
+        i += 1;
+        cursor = endptr + 1;
+    }
+    Py_ssize_t n_cigar_op = i;
+    // Make sure the bytes object is made smaller if necessary.
+    if (_PyBytes_Resize(&raw, n_cigar_op * 4) == -1){
+        Py_DECREF(raw); return -1;
+    }
+    self->raw = raw;
+    self->n_cigar_op = n_cigar_op;
+    self->cigar = cigar;
+    return 0;
+}
+
+static PyMethodDef BamCigar_methods[] = {
+    BAM_CIGAR_FROM_ITER_METHODDEF,
+    BAM_CIGAR_FROM_BYTES_METHODDEF,
+    BAM_CIGAR_FROM_BUFFER_METHODDEF,
+    {NULL}
+};
+
+
+typedef struct {
+    PyObject_HEAD
+    PyObject * bam_cigar;
+    uint32_t * cigar;
+    Py_ssize_t n_cigar_op;
+    Py_ssize_t pos;
+} BamCigarIter;
+
+static void
+BamCigarIter_dealloc(BamCigarIter * self) {
+    Py_CLEAR(self->bam_cigar);
+    Py_TYPE(self)->tp_free((PyObject *)self);
+}
+
+static PyObject*
+BamCigarIter__next__(BamCigarIter * self) {
+    if (self->pos == self->n_cigar_op) {
+        PyErr_SetNone(PyExc_StopIteration);
+        return NULL;
+    }
+    uint32_t c = self->cigar[self->pos];
+    Py_ssize_t cigar_op = bam_cigar_op(c);
+    Py_ssize_t cigar_oplen = bam_cigar_oplen(c);
+    self->pos += 1;
+    return PyTuple_Pack(2,
+        PyLong_FromSsize_t(cigar_op), PyLong_FromSsize_t(cigar_oplen));
+}
+
+static PyObject *
+BamCigarIter__iter__(BamCigarIter * self) {
+    Py_INCREF(self);
+    return (PyObject *)self;
+}
+
+static PyTypeObject BamCigarIter_Type = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_name = "_bam.CigarIter",
+    .tp_basicsize = sizeof(BamCigarIter),
+    .tp_flags = Py_TPFLAGS_DEFAULT,
+    .tp_dealloc = (destructor)BamCigarIter_dealloc,
+    .tp_iter = (getiterfunc)BamCigarIter__iter__,
+    .tp_iternext = (iternextfunc)BamCigarIter__next__,
+};
+
+static PyObject *
+BamCigar__iter__(BamCigar * self) {
+    BamCigarIter *iter = PyObject_NEW(BamCigarIter, &BamCigarIter_Type);
+    Py_INCREF(self);
+    iter->bam_cigar = (PyObject *)self;
+    iter->cigar = self->cigar;
+    iter->n_cigar_op = self->n_cigar_op;
+    iter->pos = 0;
+    return (PyObject *)iter;
+}
+
+static PyTypeObject BamCigar_Type = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    .tp_name = "_bam.Cigar",
+    .tp_basicsize = sizeof(BamCigar),
+    .tp_dealloc = (destructor)BamCigar_dealloc,
+    .tp_init = (initproc)BamCigar__init__,
+    .tp_doc = BamCigar_init__doc__,
+    .tp_methods = BamCigar_methods,
+    .tp_getset = BamCigar_properties,
+    .tp_new = PyType_GenericNew,
+    .tp_iter = (getiterfunc)BamCigar__iter__,
+    .tp_richcompare = (richcmpfunc)BamCigar_richcompare,
+    .tp_as_buffer = &BamCigar_as_buffer,
+    .tp_str = (reprfunc)BamCigar__str__,
+    .tp_repr = (reprfunc)BamCigar__repr__,
+};
 
 typedef struct {
     PyObject_HEAD
@@ -268,6 +738,45 @@ BamRecord_set_tags(BamRecord * self, PyObject * new_tags, void* closure)
     return 0;
 }
 
+PyDoc_STRVAR(BamRecord_cigar_doc, 
+"A BamCigar object representing the CIGAR information.");
+
+static PyObject *
+BamRecord_get_cigar(BamRecord * self, void * closure) {
+    if (self->n_cigar_op == 2) {
+        // Initiate CG tag check
+        uint32_t * cigar = (uint32_t *)PyBytes_AS_STRING(self->cigar);
+        if ((bam_cigar_op(cigar[0]) == BAM_CSOFT_CLIP) && 
+            (bam_cigar_oplen(cigar[0]) == self->l_seq)) {
+                PyErr_SetString(PyExc_NotImplementedError, 
+                    "Support for cigars longer than 65536 has not yet been implemented.");
+                return NULL;
+            }
+    }
+    Py_INCREF(self->cigar);
+    return BamCigar_FromBytesAndSize(self->cigar, self->n_cigar_op);
+}
+
+static int 
+BamRecord_set_cigar(BamRecord * self, BamCigar * new_cigar, void * closure) {
+    if (Py_TYPE(new_cigar) != &BamCigar_Type) {
+        PyErr_Format(PyExc_TypeError, "cigar must be of BamCigar type, got %s.",
+            Py_TYPE(new_cigar)->tp_name);
+        return -1; 
+    }
+    if (new_cigar->n_cigar_op > 65536) {
+        PyErr_SetString(PyExc_NotImplementedError, 
+            "Support for cigars longer than 65536 has not yet been implemented.");
+        return -1;
+    }
+    PyObject * tmp = self->cigar;
+    Py_INCREF(new_cigar->raw);
+    self->cigar = new_cigar->raw;
+    self->n_cigar_op = new_cigar->n_cigar_op;
+    Py_DECREF(tmp);
+    return 0;
+}
+
 // Flags 
 #define GET_FLAG_PROP(prop_name, FLAG) \
 static PyObject * \
@@ -330,6 +839,8 @@ static PyGetSetDef BamRecord_properties[] = {
      BamRecord_read_name_doc, NULL},
     {"tags", (getter)BamRecord_get_tags, (setter)BamRecord_set_tags,
      BamRecord_tags_doc, NULL},
+    {"cigar", (getter)BamRecord_get_cigar, (setter)BamRecord_set_cigar,
+     BamRecord_cigar_doc, NULL},
     {"is_paired", (getter)BamRecord_is_paired, NULL, 
      BamRecord_is_paired_doc, NULL},
     {"is_proper_pair", (getter)BamRecord_is_proper_pair, NULL, 
@@ -365,7 +876,7 @@ PyDoc_STRVAR(BamRecord_to_bytes__doc__,
     {"to_bytes", (PyCFunction)(void(*)(void))BamRecord_to_bytes, METH_NOARGS, \
      BamRecord_to_bytes__doc__}
 
-static void 
+static void
 BamRecord_to_ptr(BamRecord *self, char * dest) {
     memcpy(dest, (char *)self + BAM_PROPERTIES_STRUCT_START,
          BAM_PROPERTIES_STRUCT_SIZE);
@@ -430,23 +941,23 @@ static PyTypeObject BamRecord_Type = {
     .tp_new = PyType_GenericNew,
 };
 
-PyDoc_STRVAR(BamBlockBuffer__doc__, 
+PyDoc_STRVAR(BamBlockBuffer__doc__,
 "A structure to create a BGZF block from BamRecord objects.\n");
 
 typedef struct {
     PyObject_HEAD
-    Py_ssize_t buffersize; 
+    Py_ssize_t buffersize;
     Py_ssize_t pos;
     char * buffer;
 } BamBlockBuffer;
 
-static void 
+static void
 BamBlockBuffer_dealloc(BamBlockBuffer *self) {
     PyMem_Free(self->buffer);
     Py_TYPE(self)->tp_free(self);
 }
 
-static int 
+static int
 BamBlockBuffer__init__(BamBlockBuffer * self, PyObject *args, PyObject *kwargs) {
     Py_ssize_t buffersize = BGZF_BLOCK_SIZE;
     self->buffer = NULL;
@@ -457,7 +968,7 @@ BamBlockBuffer__init__(BamBlockBuffer * self, PyObject *args, PyObject *kwargs) 
             return -1;
     }
     if (buffersize < 0) {
-        PyErr_Format(PyExc_ValueError, 
+        PyErr_Format(PyExc_ValueError,
                      "buffer size must be larger than 0. Got: %ld", buffersize);
         return -1;
     }
@@ -466,7 +977,7 @@ BamBlockBuffer__init__(BamBlockBuffer * self, PyObject *args, PyObject *kwargs) 
         PyErr_NoMemory();
         return -1;
     }
-    self->buffer = tmp; 
+    self->buffer = tmp;
     self->buffersize = buffersize;
     self->pos = 0;
     return 0;
@@ -475,7 +986,7 @@ BamBlockBuffer__init__(BamBlockBuffer * self, PyObject *args, PyObject *kwargs) 
 static PyMemberDef BamBlockBuffer_members[] = {
     {"buffersize", T_PYSSIZET, offsetof(BamBlockBuffer, buffersize), READONLY,
      "The size of the internal buffer."},
-    {"bytes_written", T_PYSSIZET, offsetof(BamBlockBuffer, pos), READONLY, 
+    {"bytes_written", T_PYSSIZET, offsetof(BamBlockBuffer, pos), READONLY,
      "The number of bytes written in the internal buffer."},
     {NULL}
 };
@@ -491,9 +1002,10 @@ PyDoc_STRVAR(BamBlockBuffer_write_doc,
     {"write", (PyCFunction)(void(*)(void))BamBlockBuffer_write, METH_O, \
      BamBlockBuffer_write_doc}
 
-static PyObject * BamBlockBuffer_write(BamBlockBuffer * self, BamRecord * bam_record) {
+static PyObject * 
+BamBlockBuffer_write(BamBlockBuffer * self, BamRecord * bam_record) {
     if (Py_TYPE(bam_record) != &BamRecord_Type) {
-        PyErr_Format(PyExc_TypeError, "Type must be BamRecord, got: %s", 
+        PyErr_Format(PyExc_TypeError, "Type must be BamRecord, got: %s",
                      Py_TYPE(bam_record)->tp_name);
         return NULL;
     }
@@ -503,7 +1015,7 @@ static PyObject * BamBlockBuffer_write(BamBlockBuffer * self, BamRecord * bam_re
         return PyLong_FromSsize_t(0);
     }
     BamRecord_to_ptr(bam_record, self->buffer + self->pos);
-    self->pos = final_pos; 
+    self->pos = final_pos;
     return PyLong_FromSsize_t(record_size);
 }
 PyDoc_STRVAR(BamBlockBuffer_reset_doc,
@@ -513,7 +1025,7 @@ PyDoc_STRVAR(BamBlockBuffer_reset_doc,
     {"reset", (PyCFunction)(void(*)(void))BamBlockBuffer_reset, METH_NOARGS, \
      BamBlockBuffer_reset_doc}
 
-static PyObject * 
+static PyObject *
 BamBlockBuffer_reset(BamBlockBuffer *self, PyObject *Py_UNUSED(ignore)) {
     self->pos = 0;
     Py_RETURN_NONE;
@@ -526,7 +1038,7 @@ PyDoc_STRVAR(BamBlockBuffer_get_block_view_doc,
     {"get_block_view", (PyCFunction)(void(*)(void))BamBlockBuffer_get_block_view, \
      METH_NOARGS, BamBlockBuffer_get_block_view_doc}
 
-static PyObject * 
+static PyObject *
 BamBlockBuffer_get_block_view(BamBlockBuffer *self, PyObject *Py_UNUSED(ignore)) {
     return PyMemoryView_FromMemory(self->buffer, self->pos, PyBUF_READ);
 }
@@ -542,7 +1054,7 @@ static PyTypeObject BamBlockBuffer_Type = {
     .tp_name = "_bam.BamBlockBuffer",
     .tp_basicsize = sizeof(BamBlockBuffer),
     .tp_dealloc = (destructor)BamBlockBuffer_dealloc,
-    .tp_init = (initproc)BamBlockBuffer__init__, 
+    .tp_init = (initproc)BamBlockBuffer__init__,
     .tp_new = PyType_GenericNew,
     .tp_doc = BamBlockBuffer__doc__,
     .tp_members = BamBlockBuffer_members,
@@ -646,8 +1158,8 @@ static PyTypeObject BamIterator_Type = {
     .tp_basicsize = sizeof(BamIterator),
     .tp_dealloc =(destructor)BamIterator_dealloc,  
     .tp_flags = Py_TPFLAGS_DEFAULT,
-    .tp_iter = (PyObject * (*)(PyObject *))BamIterator_iter,
-    .tp_iternext = (PyObject * (*)(PyObject *))BamIterator_iternext
+    .tp_iter = (getiterfunc)BamIterator_iter,
+    .tp_iternext = (iternextfunc)BamIterator_iternext
 };
 
 PyDoc_STRVAR(bam_iterator_doc,
@@ -717,6 +1229,18 @@ PyInit__bam(void)
     PyObject * BamBlockBufferType = (PyObject *)&BamBlockBuffer_Type;
     Py_INCREF(BamBlockBufferType);
     if (PyModule_AddObject(m, "BamBlockBuffer", BamBlockBufferType) < 0) {
+        return NULL;
+    }
+
+    if (PyType_Ready(&BamCigar_Type) < 0)
+        return NULL;
+    PyObject * BamCigarType = (PyObject *)&BamCigar_Type;
+    Py_INCREF(BamCigarType);
+    if (PyModule_AddObject(m, "Cigar", BamCigarType) < 0)
+        return NULL;
+
+    // Ready BamCigarIterType but do not expose it.
+    if (PyType_Ready(&BamCigarIter_Type) < 0) {
         return NULL;
     }
 

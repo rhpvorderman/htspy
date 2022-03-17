@@ -17,14 +17,46 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+import enum
 import io
 import struct
 import typing
 from typing import Dict, Iterator, List, Tuple
 
-from ._bam import BamBlockBuffer as _BamBlockBuffer
-from ._bam import BamRecord, bam_iterator
+# Cigar is part of the API even if not used here.
+from ._bam import (  # noqa: F401
+    BAM_CBACK,
+    BAM_CDEL,
+    BAM_CDIFF,
+    BAM_CEQUAL,
+    BAM_CHARD_CLIP,
+    BAM_CINS,
+    BAM_CMATCH,
+    BAM_CPAD,
+    BAM_CREF_SKIP,
+    BAM_CSOFT_CLIP,
+    BamBlockBuffer as _BamBlockBuffer,
+    BamRecord,
+    Cigar,
+    bam_iterator,
+)
 from .bgzf import BGZFReader, BGZFWriter, BGZF_BLOCK_SIZE
+
+
+class CigarOp(enum.IntEnum):
+    MATCH = BAM_CMATCH
+    INS = BAM_CINS
+    INSERT = BAM_CINS
+    DEL = BAM_CDEL
+    DELETE = BAM_CDEL
+    REF_SKIP = BAM_CREF_SKIP
+    REFERENCE_SKIP = BAM_CREF_SKIP
+    SOFT_CLIP = BAM_CSOFT_CLIP
+    HARD_CLIP = BAM_CHARD_CLIP
+    PAD = BAM_CPAD
+    EQUAL = BAM_CEQUAL
+    DIFF = BAM_CDIFF
+    BACK = BAM_CBACK
 
 
 class BAMFormatError(Exception):
