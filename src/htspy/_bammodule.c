@@ -38,11 +38,6 @@ typedef struct {
 #define BamCigar_GET_CIGAR(op) ((BamCigar *)op)->cigar
 static PyTypeObject BamCigar_Type;  // Forward declaration
 
-static void
-BamCigar_dealloc(BamCigar *self) {
-    Py_TYPE(self)->tp_free((PyObject *)self);
-}
-
 /**
  * @brief Creates a new BamCigar from the given uint32_t pointer.
  *
@@ -473,7 +468,6 @@ static PyTypeObject BamCigar_Type = {
     .tp_name = "_bam.Cigar",
     .tp_basicsize = sizeof(BamCigar),
     .tp_itemsize = sizeof(uint32_t),
-    .tp_dealloc = (destructor)BamCigar_dealloc,
     .tp_doc = BamCigar_init__doc__,
     .tp_methods = BamCigar_methods,
     .tp_getset = BamCigar_properties,
@@ -483,6 +477,7 @@ static PyTypeObject BamCigar_Type = {
     .tp_as_buffer = &BamCigar_as_buffer,
     .tp_str = (reprfunc)BamCigar__str__,
     .tp_repr = (reprfunc)BamCigar__repr__,
+    .tp_free = PyObject_Del,
 };
 
 typedef struct {
