@@ -736,44 +736,44 @@ BamRecord_set_tags(BamRecord * self, PyObject * new_tags, void* closure)
     return 0;
 }
 
-// PyDoc_STRVAR(BamRecord_cigar_doc, 
-// "A BamCigar object representing the CIGAR information.");
+PyDoc_STRVAR(BamRecord_cigar_doc, 
+"A BamCigar object representing the CIGAR information.");
 
-// static PyObject *
-// BamRecord_get_cigar(BamRecord * self, void * closure) {
-//     if (self->n_cigar_op == 2) {
-//         // Initiate CG tag check
-//         uint32_t * cigar = (uint32_t *)PyBytes_AS_STRING(self->cigar);
-//         if ((bam_cigar_op(cigar[0]) == BAM_CSOFT_CLIP) && 
-//             (bam_cigar_oplen(cigar[0]) == self->l_seq)) {
-//                 PyErr_SetString(PyExc_NotImplementedError, 
-//                     "Support for cigars longer than 65536 has not yet been implemented.");
-//                 return NULL;
-//             }
-//     }
-//     Py_INCREF(self->cigar);
-//     return BamCigar_FromBytesAndSize(self->cigar, self->n_cigar_op);
-// }
+static PyObject *
+BamRecord_get_cigar(BamRecord * self, void * closure) {
+    if (self->n_cigar_op == 2) {
+        // Initiate CG tag check
+        uint32_t * cigar = BamCigar_GET_CIGAR(self->cigar);
+        if ((bam_cigar_op(cigar[0]) == BAM_CSOFT_CLIP) && 
+            (bam_cigar_oplen(cigar[0]) == self->l_seq)) {
+                PyErr_SetString(PyExc_NotImplementedError, 
+                    "Support for cigars longer than 65536 has not yet been implemented.");
+                return NULL;
+            }
+    }
+    Py_INCREF(self->cigar);
+    return (PyObject *)self->cigar;
+}
 
-// static int 
-// BamRecord_set_cigar(BamRecord * self, BamCigar * new_cigar, void * closure) {
-//     if (Py_TYPE(new_cigar) != &BamCigar_Type) {
-//         PyErr_Format(PyExc_TypeError, "cigar must be of BamCigar type, got %s.",
-//             Py_TYPE(new_cigar)->tp_name);
-//         return -1; 
-//     }
-//     if (Py_SIZE(new_cigar) > 65536) {
-//         PyErr_SetString(PyExc_NotImplementedError, 
-//             "Support for cigars longer than 65536 has not yet been implemented.");
-//         return -1;
-//     }
-//     PyObject * tmp = self->cigar;
-//     Py_INCREF(new_cigar);
-//     self->cigar = new_cigar;
-//     self->n_cigar_op = Py_SIZE(new_cigar);
-//     Py_DECREF(tmp);
-//     return 0;
-// }
+static int 
+BamRecord_set_cigar(BamRecord * self, BamCigar * new_cigar, void * closure) {
+    if (Py_TYPE(new_cigar) != &BamCigar_Type) {
+        PyErr_Format(PyExc_TypeError, "cigar must be of BamCigar type, got %s.",
+            Py_TYPE(new_cigar)->tp_name);
+        return -1; 
+    }
+    if (Py_SIZE(new_cigar) > 65536) {
+        PyErr_SetString(PyExc_NotImplementedError, 
+            "Support for cigars longer than 65536 has not yet been implemented.");
+        return -1;
+    }
+    PyObject * tmp = self->cigar;
+    Py_INCREF(new_cigar);
+    self->cigar = (PyObject *)new_cigar;
+    self->n_cigar_op = Py_SIZE(new_cigar);
+    Py_DECREF(tmp);
+    return 0;
+}
 
 // Flags 
 #define GET_FLAG_PROP(prop_name, FLAG) \
@@ -837,8 +837,8 @@ static PyGetSetDef BamRecord_properties[] = {
      BamRecord_read_name_doc, NULL},
     {"tags", (getter)BamRecord_get_tags, (setter)BamRecord_set_tags,
      BamRecord_tags_doc, NULL},
-    // {"cigar", (getter)BamRecord_get_cigar, (setter)BamRecord_set_cigar,
-    //  BamRecord_cigar_doc, NULL},
+    {"cigar", (getter)BamRecord_get_cigar, (setter)BamRecord_set_cigar,
+     BamRecord_cigar_doc, NULL},
     {"is_paired", (getter)BamRecord_is_paired, NULL, 
      BamRecord_is_paired_doc, NULL},
     {"is_proper_pair", (getter)BamRecord_is_proper_pair, NULL, 
@@ -887,9 +887,9 @@ BamRecord_to_ptr(BamRecord *self, char * dest) {
     // Terminate read_name with NULL byte
     dest[cursor] = 0; cursor += 1;
 
-    Py_ssize_t cigar_size = PyBytes_GET_SIZE(self->cigar);
-    memcpy(dest + cursor, PyBytes_AS_STRING(self->cigar), cigar_size);
-    cursor += cigar_size;
+    Py_ssize_t cigar_char_size = Py_SIZE(self->cigar) * sizeof(uint32_t);
+    memcpy(dest + cursor, BamCigar_GET_CIGAR(self->cigar), cigar_char_size);
+    cursor += cigar_char_size;
 
     Py_ssize_t seq_size = PyBytes_GET_SIZE(self->seq);
     memcpy(dest + cursor, PyBytes_AS_STRING(self->seq), seq_size);
@@ -1117,8 +1117,8 @@ BamIterator_iternext(BamIterator *self){
     self->pos += bam_record->l_read_name;
 
     Py_ssize_t cigar_length = bam_record->n_cigar_op * sizeof(uint32_t);
-    bam_record->cigar = PyBytes_FromStringAndSize(
-        self->buf + self->pos, cigar_length);
+    bam_record->cigar = BamCigar_FromPointerAndSize(
+        (uint32_t *)(self->buf + self->pos), bam_record->n_cigar_op);
     self->pos += cigar_length;
 
     Py_ssize_t seq_length = (bam_record->l_seq + 1) / 2;

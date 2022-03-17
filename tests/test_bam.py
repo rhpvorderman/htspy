@@ -48,7 +48,7 @@ def test_bam_parsing():
     assert parsed_record._next_pos == next_pos
     assert parsed_record._tlen == tlen
     assert parsed_record._read_name == read_name
-    assert parsed_record._cigar == cigar.tobytes()
+    assert parsed_record._cigar == Cigar.from_buffer(cigar)
     assert parsed_record._seq == seq
     assert parsed_record._qual == quals
     assert parsed_record._tags == tags
