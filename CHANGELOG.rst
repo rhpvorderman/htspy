@@ -9,5 +9,6 @@ Changelog
 
 0.1.0-dev
 --------------------
++ Implement full CIGAR string/array support in the ``Cigar`` type.
 + Implemented BAM writing capability.
 + Implemented basic BAM reading capability.
