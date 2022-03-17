@@ -745,7 +745,7 @@ static PyObject *
 BamRecord_get_cigar(BamRecord * self, void * closure) {
     if (self->n_cigar_op == 2) {
         // Initiate CG tag check
-        uint32_t * cigar = (uint32_t)PyBytes_AS_STRING(self->cigar);
+        uint32_t * cigar = (uint32_t *)PyBytes_AS_STRING(self->cigar);
         if ((bam_cigar_op(cigar[0]) == BAM_CSOFT_CLIP) && 
             (bam_cigar_oplen(cigar[0]) == self->l_seq)) {
                 PyErr_SetString(PyExc_NotImplementedError, 

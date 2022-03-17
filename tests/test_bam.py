@@ -2,7 +2,7 @@ import array
 import struct
 
 from htspy._bam import BAM_CDIFF, BAM_CIGAR_SHIFT, BAM_CMATCH, \
-    BAM_FUNMAP, bam_iterator
+    BAM_FUNMAP, BamCigar, bam_iterator
 
 
 def test_bam_parsing():
@@ -52,3 +52,4 @@ def test_bam_parsing():
     assert parsed_record._seq == seq
     assert parsed_record._qual == quals
     assert parsed_record._tags == tags
+    assert parsed_record.cigar == BamCigar("4M3X")
