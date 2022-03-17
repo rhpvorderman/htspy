@@ -22,7 +22,7 @@ import array
 
 from htspy.bam import BAM_CBACK, BAM_CDEL, BAM_CDIFF, BAM_CEQUAL, \
     BAM_CHARD_CLIP, BAM_CINS, BAM_CMATCH, BAM_CPAD, BAM_CREF_SKIP, \
-    BAM_CSOFT_CLIP, BamCigar
+    BAM_CSOFT_CLIP, Cigar
 
 import pytest
 
@@ -65,20 +65,20 @@ CIGAR_TUPLES = [
 
 
 def test_bam_cigar___init__():
-    bam_cigar = BamCigar(CIGAR_STRING)
+    bam_cigar = Cigar(CIGAR_STRING)
     assert bam_cigar.number_of_operations == len(CIGAR_TUPLES)
 
 
 def test_bam_cigar__str__():
-    assert str(BamCigar(CIGAR_STRING)) == CIGAR_STRING
+    assert str(Cigar(CIGAR_STRING)) == CIGAR_STRING
 
 
 def test_bam_cigar_to_tuples():
-    assert list(BamCigar(CIGAR_STRING)) == CIGAR_TUPLES
+    assert list(Cigar(CIGAR_STRING)) == CIGAR_TUPLES
 
 
 def test_bam_cigar_buffer():
-    bam_cigar = BamCigar(CIGAR_STRING)
+    bam_cigar = Cigar(CIGAR_STRING)
     view = memoryview(bam_cigar)
     assert view.tobytes() == bam_cigar.raw
     assert view.nbytes == len(bam_cigar.raw)
@@ -93,18 +93,18 @@ def test_bam_cigar_buffer():
 
 
 def test_bam_cigar_from_bytes():
-    bam_cigar = BamCigar(CIGAR_STRING)
-    assert BamCigar.from_bytes(bam_cigar.raw) == bam_cigar
+    bam_cigar = Cigar(CIGAR_STRING)
+    assert Cigar.from_bytes(bam_cigar.raw) == bam_cigar
 
 
 def test_bam_cigar_from_bytes_error():
-    bam_cigar = BamCigar(CIGAR_STRING)
+    bam_cigar = Cigar(CIGAR_STRING)
     with pytest.raises(ValueError) as error:
-        BamCigar.from_bytes(bam_cigar.raw + b"12")
+        Cigar.from_bytes(bam_cigar.raw + b"12")
     error.match('Size of b must be a multiple of 4')
 
 
 def test_bam_cigar_from_buffer():
-    bam_cigar = BamCigar(CIGAR_STRING)
+    bam_cigar = Cigar(CIGAR_STRING)
     cigar_array = array.array("I", CIGAR_NUMBER_LIST)
-    assert BamCigar.from_buffer(cigar_array) == bam_cigar
+    assert Cigar.from_buffer(cigar_array) == bam_cigar

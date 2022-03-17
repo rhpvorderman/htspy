@@ -26,7 +26,7 @@ from typing import Dict, Iterator, List, Tuple
 from ._bam import (
     BamRecord,
     bam_iterator,
-    BamCigar,
+    Cigar,
     BAM_CMATCH,
     BAM_CINS,
     BAM_CDEL,

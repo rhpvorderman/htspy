@@ -179,7 +179,7 @@ BamCigar__repr__(BamCigar * self){
     if (cigarstring == NULL){
         return NULL;
     }
-    return PyUnicode_FromFormat("BamCigar(%R)", cigarstring);
+    return PyUnicode_FromFormat("Cigar(%R)", cigarstring);
 }
 
 PyDoc_STRVAR(BamCigar_from_iter__doc__,
@@ -461,7 +461,7 @@ BamCigarIter__iter__(BamCigarIter * self) {
 
 static PyTypeObject BamCigarIter_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_name = "_bam.BamCigarIter",
+    .tp_name = "_bam.CigarIter",
     .tp_basicsize = sizeof(BamCigarIter),
     .tp_flags = Py_TPFLAGS_DEFAULT,
     .tp_dealloc = (destructor)BamCigarIter_dealloc,
@@ -482,7 +482,7 @@ BamCigar__iter__(BamCigar * self) {
 
 static PyTypeObject BamCigar_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_name = "_bam.BamCigar",
+    .tp_name = "_bam.Cigar",
     .tp_basicsize = sizeof(BamCigar),
     .tp_dealloc = (destructor)BamCigar_dealloc,
     .tp_init = (initproc)BamCigar__init__,
@@ -1236,7 +1236,7 @@ PyInit__bam(void)
         return NULL;
     PyObject * BamCigarType = (PyObject *)&BamCigar_Type;
     Py_INCREF(BamCigarType);
-    if (PyModule_AddObject(m, "BamCigar", BamCigarType) < 0)
+    if (PyModule_AddObject(m, "Cigar", BamCigarType) < 0)
         return NULL;
 
     // Ready BamCigarIterType but do not expose it.
