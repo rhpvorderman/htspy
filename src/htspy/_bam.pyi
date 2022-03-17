@@ -68,6 +68,9 @@ class BamRecord:
     qualities: bytes
 
     @property
+    def cigar(self) -> BamCigar: ...
+
+    @property
     def query_name(self) -> bytes: ...
 
     @property
