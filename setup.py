@@ -52,10 +52,8 @@ setup(
     ],
     python_requires=">=3.6",
     extras_require={
-        ':platform.machine == "x86_64" and '
-        'python_implementation != "PyPy"': ['isal>=0.9.0'],
-        ':platform.machine == "AMD64" and '
-        'python_implementation != "PyPy"': ['isal>=0.9.0'],
+        ":platform.python_implementation == 'CPython' and "
+        "(platform.machine == 'x86_64' or platform.machine == 'AMD64')": ['isal']
     },
     ext_modules=[
         Extension("htspy._bam", ["src/htspy/_bammodule.c"])
