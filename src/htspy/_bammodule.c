@@ -24,77 +24,116 @@
 
 #include "_conversions.h"
 
+// Py_SET_SIZE, Py_SET_REFCNT and Py_SET_TYPE where all introduced and 
+// recommended in Python 3.9
+#if (PY_VERSION_HEX > 0x03090000)
+    #define PyObject_SET_REFCOUNT(op, count) Py_SET_REFCNT(op, count)
+    #define BamCigar_SET_SIZE(op, size) Py_SET_SIZE(op, size)
+    #define BamCigar_SET_TYPE(op) Py_SET_TYPE(op, &BamCigar_Type)
+#else 
+    #define PyObject_SET_REFCOUNT(op, count) Py_REFCNT(op) = count
+    #define BamCigar_SET_SIZE(op, size) Py_SIZE(op) = size
+    #define BamCigar_SET_TYPE(op) Py_TYPE(op) = &BamCigar_Type
+#endif
 #define BAM_CIGAR_MAX_COUNT 0xFFFFFFF
 #define BAM_CIGAR_MAX_OP 9
 
 #define BGZF_BLOCK_SIZE 0xff00  // From bgzf.h
 
 typedef struct {
-    PyObject_HEAD
-    PyObject * raw;
-    uint32_t * cigar;
-    Py_ssize_t n_cigar_op;
-
+    PyObject_VAR_HEAD
+    uint32_t cigar[0];
 } BamCigar;
 
+#define BamCigar_OBJECT_SIZE sizeof(BamCigar)
+#define BamCigar_GET_CIGAR(op) ((BamCigar *)op)->cigar
 static PyTypeObject BamCigar_Type;  // Forward declaration
 
-static void
-BamCigar_dealloc(BamCigar *self) {
-    Py_CLEAR(self->raw);
-    Py_TYPE(self)->tp_free((PyObject *)self);
-}
-
 /**
- * @brief Creates a new BamCigar without checks. For internal calls only. 
- *        Steals a reference to the bytes object.
+ * @brief Creates a new BamCigar from the given uint32_t pointer.
  *
- * @param bytes a PyBytesObject (not checked, reference stealed.)
- * @param n_cigar_op number of cigar units. Not checked with length of Bytes object.
+ * @param cigar_ptr the pointer to the raw cigar array. If NULL the BamCigar 
+ *                  is not initialized.
+ * @param n_cigar_op number of cigar units.
  * @return PyObject*
  */
 static PyObject *
-BamCigar_FromBytesAndSize(PyObject * bytes, Py_ssize_t n_cigar_op) {
-    BamCigar *cigar = PyObject_New(BamCigar, &BamCigar_Type);
-    cigar->raw = bytes;
-    cigar->cigar = (uint32_t *)PyBytes_AS_STRING(bytes);
-    cigar->n_cigar_op = n_cigar_op;
-    return (PyObject *)cigar;
+BamCigar_FromPointerAndSize(uint32_t * cigar_ptr, Py_ssize_t n_cigar_op) {
+    BamCigar * obj;
+    size_t size = n_cigar_op * sizeof(uint32_t);
+    if (size > PY_SSIZE_T_MAX) {
+        PyErr_SetString(PyExc_OverflowError, "Cigar array too large.");
+        return NULL;
+    }
+    obj = PyObject_Malloc(BamCigar_OBJECT_SIZE + size);
+    if (obj == NULL) {
+        return PyErr_NoMemory();
+    }
+    PyObject_SET_REFCOUNT(obj, 1);
+    BamCigar_SET_TYPE(obj);
+    BamCigar_SET_SIZE(obj, n_cigar_op);
+    if (cigar_ptr != NULL) {
+        memcpy(obj->cigar, cigar_ptr, size);
+    }
+    return (PyObject *)obj;
 }
 
-static PyObject *
-BamCigar_raw(BamCigar *self, void *closure){
-    Py_INCREF(self->raw);
-    return self->raw;
+static int
+_BamCigar_Resize(PyObject **obj, Py_ssize_t new_n_cigar_op) {
+    PyObject * orig_obj = *obj;
+    size_t new_size = new_n_cigar_op * sizeof(uint32_t);
+    if (new_n_cigar_op < 0 || Py_REFCNT(orig_obj) != 1) {
+        PyErr_BadInternalCall();
+        return -1;
+    }
+    if (Py_SIZE(orig_obj) == new_n_cigar_op) {
+        return 0;
+    }
+    if (new_n_cigar_op == 0){
+        *obj = BamCigar_FromPointerAndSize(NULL, 0);
+        Py_DECREF(orig_obj);
+        return 0;
+    }
+    *obj = PyObject_Realloc(orig_obj, BamCigar_OBJECT_SIZE + new_size);
+    if (*obj == NULL) {
+        PyObject_Free(orig_obj);
+        PyErr_NoMemory();
+        return -1;
+    }
+    BamCigar_SET_SIZE(*obj, new_n_cigar_op);
+    return 0;
 }
 
 static PyObject *
 BamCigar_number_of_operations(BamCigar *self, void *closure){
-    return PyLong_FromSsize_t(self->n_cigar_op);
+    return PyLong_FromSsize_t(Py_SIZE(self));
 }
 
 static PyGetSetDef BamCigar_properties[] = {
-    {"raw", (getter)BamCigar_raw, NULL,
-    "The underlying bytes object with the cigar array.", NULL},
     {"number_of_operations", (getter)BamCigar_number_of_operations, NULL,
     "The number of CIGAR operations (n_cigar_op).", NULL},
     {NULL},
 };
 
+static inline int
+BamCigar_equals(BamCigar *self, BamCigar *other) {
+    if (Py_TYPE(other) != &BamCigar_Type) {
+        return 0;
+    }
+    if (Py_SIZE(self) != Py_SIZE(other)) {
+        return 0;
+    }
+    Py_ssize_t size = Py_SIZE(self) * sizeof(uint32_t);
+    return (memcmp(self->cigar, other->cigar, size) == 0);
+}
+
 static PyObject *
 BamCigar_richcompare(BamCigar *self, BamCigar *other, int op) {
     switch (op) {
         case Py_EQ:
+           return PyBool_FromLong(BamCigar_equals(self, other));
         case Py_NE:
-            if (Py_TYPE(other) != &BamCigar_Type) {
-                if (op == Py_EQ) {
-                    Py_RETURN_FALSE;
-                }
-                else {
-                    Py_RETURN_TRUE;
-                }
-            }
-            return PyObject_RichCompare(self->raw, other->raw, op);
+            return PyBool_FromLong(!BamCigar_equals(self, other));
         default:
             Py_RETURN_NOTIMPLEMENTED;
     }
@@ -112,7 +151,7 @@ BamCigar_get_buffer(BamCigar *self, Py_buffer *view, int flags) {
     Py_INCREF(self);
     view->obj = (PyObject *)self;
     view->buf = (void *)self->cigar;
-    view->len = sizeof(uint32_t) * self->n_cigar_op;
+    view->len = sizeof(uint32_t) * Py_SIZE(self);
     view->readonly = 1;
     view->itemsize = sizeof(uint32_t);
     view->format = NULL;
@@ -121,7 +160,7 @@ BamCigar_get_buffer(BamCigar *self, Py_buffer *view, int flags) {
     view->ndim = 1;
     view->shape = NULL;
     if ((flags & PyBUF_ND) == PyBUF_ND)
-        view->shape = &(self->n_cigar_op);
+        view->shape = &(Py_SIZE(self));
     view->strides = NULL;
     if ((flags & PyBUF_STRIDES) == PyBUF_STRIDES)
         view->strides = &(view->itemsize);
@@ -142,9 +181,9 @@ BamCigar__str__(BamCigar *self) {
     // has the disadvantage that we probably assign way too much memory, but
     // at the advantage that sprintf can never overshoot, so there is no need
     // to check, and the memory never has to be resized.
-    Py_ssize_t n_cigar_op = self->n_cigar_op;
+    Py_ssize_t n_cigar_op = Py_SIZE(self);
     uint32_t * cigar = self->cigar;
-    size_t max_size = self->n_cigar_op * 10;
+    size_t max_size = n_cigar_op * 10;
     char * buffer = PyMem_Malloc(max_size);
     if (buffer == NULL) {
         return PyErr_NoMemory();
@@ -193,7 +232,7 @@ PyDoc_STRVAR(BamCigar_from_iter__doc__,
     METH_O | METH_CLASS, BamCigar_from_iter__doc__}
 
 #define BAMCIGAR_FROM_ITER_ERROR_EXIT \
-    Py_DECREF(cigartuples);Py_DECREF(raw); return NULL;
+    Py_DECREF(cigartuples);Py_DECREF(cigar_obj); return NULL;
 
 static PyObject *
 BamCigar_from_iter(PyTypeObject *type, PyObject *cigartuples_in) {
@@ -203,13 +242,12 @@ BamCigar_from_iter(PyTypeObject *type, PyObject *cigartuples_in) {
         return NULL;
     }
     Py_ssize_t n_cigar_op = PySequence_Fast_GET_SIZE(cigartuples);
-    PyObject * raw = PyBytes_FromStringAndSize(
-                        NULL, n_cigar_op * sizeof(uint32_t));
-    if (raw == NULL){
+    PyObject * cigar_obj = BamCigar_FromPointerAndSize(NULL, n_cigar_op);
+    if (cigar_obj == NULL){
         Py_DECREF(cigartuples);
         return PyErr_NoMemory();
     }
-    uint32_t * cigar = (uint32_t *)PyBytes_AS_STRING(raw);
+    uint32_t * cigar = BamCigar_GET_CIGAR(cigar_obj);
     Py_ssize_t i = 0;
     PyObject * tup;
     PyObject * operation;
@@ -270,36 +308,7 @@ BamCigar_from_iter(PyTypeObject *type, PyObject *cigartuples_in) {
         i += 1;
     }
     Py_DECREF(cigartuples);
-    return BamCigar_FromBytesAndSize(raw, n_cigar_op);
-}
-
-PyDoc_STRVAR(BamCigar_from_bytes__doc__,
-"from_bytes($cls, b, /)\n"
-"--\n"
-"\n"
-"Create a new BamCigar from a bytes object b.\n"
-"\n"
-"This is the fastest method, as the bytes object is referenced internally\n"
-"instead of being copied."
-);
-#define BAM_CIGAR_FROM_BYTES_METHODDEF    \
-    {"from_bytes", (PyCFunction)(void(*)(void))BamCigar_from_bytes, \
-    METH_O | METH_CLASS, BamCigar_from_bytes__doc__}
-
-static PyObject *
-BamCigar_from_bytes(PyTypeObject *type, PyObject *b) {
-    if (!PyBytes_CheckExact(b)){
-        PyErr_Format(PyExc_TypeError, "b must be a bytes object, got %s.",
-                     Py_TYPE(b)->tp_name);
-        return NULL;
-    }
-    Py_ssize_t size = PyBytes_GET_SIZE(b);
-    if (size % 4){
-        PyErr_SetString(PyExc_ValueError, "Size of b must be a multiple of 4");
-        return NULL;
-    }
-    Py_INCREF(b);
-    return BamCigar_FromBytesAndSize(b, size / 4);
+    return cigar_obj;
 }
 
 PyDoc_STRVAR(BamCigar_from_buffer__doc__,
@@ -327,8 +336,8 @@ BamCigar_from_buffer(PyTypeObject *type, PyObject *data) {
             "buffer length not a multiple of 4");
         return NULL;
     }
-    PyObject * raw = PyBytes_FromStringAndSize((char *)buffer.buf, buffer.len);
-    return BamCigar_FromBytesAndSize(raw, buffer.len / 4);
+    Py_ssize_t n_cigar_op = buffer.len / 4;
+    return BamCigar_FromPointerAndSize((uint32_t *)buffer.buf, n_cigar_op);
 }
 
 PyDoc_STRVAR(BamCigar_init__doc__,
@@ -338,26 +347,24 @@ PyDoc_STRVAR(BamCigar_init__doc__,
 "Create a new BamCigar from a cigarstring.\n"
 );
 
-static int
-BamCigar__init__(BamCigar *self, PyObject *args, PyObject *kwargs) {
-    self->cigar = NULL;
-    self->raw = NULL;
+static PyObject *
+BamCigar__new___(PyTypeObject *type, PyObject *args, PyObject *kwargs) {
     PyObject * cigarstring = NULL;
     char * keywords[] = {"", NULL};
     const char *format = "O|:BamCigar.__init__";
     if (!PyArg_ParseTupleAndKeywords(
             args, kwargs, format, keywords, &cigarstring)) {
-        return -1;
+        return NULL;
     }
     if (!PyUnicode_CheckExact(cigarstring)) {
         PyErr_Format(PyExc_TypeError, "cigarstring must be of type str, got %s",
             Py_TYPE(cigarstring)->tp_name);
-        return -1;
+        return NULL;
     }
     if (!PyUnicode_IS_COMPACT_ASCII(cigarstring)) {
         PyErr_SetString(PyExc_ValueError,
             "cigarstring must be a valid ascii string");
-        return -1;
+        return NULL;
     }
     Py_ssize_t string_size = PyUnicode_GET_LENGTH(cigarstring);
     char * cigar_string_ptr = (char *)PyUnicode_1BYTE_DATA(cigarstring);
@@ -365,14 +372,12 @@ BamCigar__init__(BamCigar *self, PyObject *args, PyObject *kwargs) {
     // uint32_t is 4 bytes. A string needs at least 2 characters to encode a
     // a cigarop + count. So maximum number of cigarops is string_size / 2.
     Py_ssize_t maximum_cigar_op = string_size / 2;
-    PyObject * raw = PyBytes_FromStringAndSize(
-                        NULL, maximum_cigar_op * sizeof(uint32_t));
-    if (raw == NULL) {
-        PyErr_NoMemory();
-        return -1;
+    PyObject * cigar_obj = BamCigar_FromPointerAndSize(NULL, maximum_cigar_op);
+    if (cigar_obj == NULL) {
+        return PyErr_NoMemory();
     }
-    uint32_t * cigar = (uint32_t *)PyBytes_AS_STRING(raw);
-    Py_ssize_t i = 0;
+    uint32_t * cigar = BamCigar_GET_CIGAR(cigar_obj);
+    Py_ssize_t n_cigar_op = 0;
     char * endptr = NULL;
     long int count;
     char operation;
@@ -382,44 +387,39 @@ BamCigar__init__(BamCigar *self, PyObject *args, PyObject *kwargs) {
         if ((count < 0)) {
             PyErr_Format(PyExc_ValueError, "Invalid cigarstring: %R",
                          cigarstring);
-            Py_DECREF(raw); return -1;
+            Py_DECREF(cigar_obj); return NULL;
         }
         if ((count > BAM_CIGAR_MAX_COUNT)) {
             PyErr_Format(
                 PyExc_ValueError, "Maximum count exceeded: %ld > %ld",
                 count, BAM_CIGAR_MAX_COUNT);
-            Py_DECREF(raw); return -1;
+            Py_DECREF(cigar_obj); return NULL;
         }
         if (endptr >= cigar_string_end) {
             PyErr_Format(
                 PyExc_ValueError, "Truncated cigarstring: %R",
                     cigarstring);
-            Py_DECREF(raw); return -1;
+            Py_DECREF(cigar_obj); return NULL;
         }
         operation = bam_cigar_table[(uint8_t)endptr[0]];
         if (operation == -1) {
             PyErr_Format(PyExc_ValueError, "Invalid cigar operation: '%c'",
                 endptr[0]);
-            Py_DECREF(raw); return -1;
+            Py_DECREF(cigar_obj); return NULL;
         }
-        cigar[i] = bam_cigar_gen(count, operation);
-        i += 1;
+        cigar[n_cigar_op] = bam_cigar_gen(count, operation);
+        n_cigar_op += 1;
         cursor = endptr + 1;
     }
-    Py_ssize_t n_cigar_op = i;
     // Make sure the bytes object is made smaller if necessary.
-    if (_PyBytes_Resize(&raw, n_cigar_op * 4) == -1){
-        Py_DECREF(raw); return -1;
+    if (_BamCigar_Resize(&cigar_obj, n_cigar_op) == -1){
+        Py_DECREF(cigar_obj); return NULL;
     }
-    self->raw = raw;
-    self->n_cigar_op = n_cigar_op;
-    self->cigar = cigar;
-    return 0;
+    return cigar_obj;
 }
 
 static PyMethodDef BamCigar_methods[] = {
     BAM_CIGAR_FROM_ITER_METHODDEF,
-    BAM_CIGAR_FROM_BYTES_METHODDEF,
     BAM_CIGAR_FROM_BUFFER_METHODDEF,
     {NULL}
 };
@@ -475,7 +475,7 @@ BamCigar__iter__(BamCigar * self) {
     Py_INCREF(self);
     iter->bam_cigar = (PyObject *)self;
     iter->cigar = self->cigar;
-    iter->n_cigar_op = self->n_cigar_op;
+    iter->n_cigar_op = Py_SIZE(self);
     iter->pos = 0;
     return (PyObject *)iter;
 }
@@ -484,17 +484,17 @@ static PyTypeObject BamCigar_Type = {
     PyVarObject_HEAD_INIT(NULL, 0)
     .tp_name = "_bam.Cigar",
     .tp_basicsize = sizeof(BamCigar),
-    .tp_dealloc = (destructor)BamCigar_dealloc,
-    .tp_init = (initproc)BamCigar__init__,
+    .tp_itemsize = sizeof(uint32_t),
     .tp_doc = BamCigar_init__doc__,
     .tp_methods = BamCigar_methods,
     .tp_getset = BamCigar_properties,
-    .tp_new = PyType_GenericNew,
+    .tp_new = BamCigar__new___,
     .tp_iter = (getiterfunc)BamCigar__iter__,
     .tp_richcompare = (richcmpfunc)BamCigar_richcompare,
     .tp_as_buffer = &BamCigar_as_buffer,
     .tp_str = (reprfunc)BamCigar__str__,
     .tp_repr = (reprfunc)BamCigar__repr__,
+    .tp_free = PyObject_Del,
 };
 
 typedef struct {
@@ -514,7 +514,7 @@ typedef struct {
     // The compiler automatically inserts 4 padding bytes here to properly
     // align the PyObject pointers in memory.
     PyObject * read_name;
-    PyObject * cigar;
+    PyObject * bamcigar;
     PyObject * seq;
     PyObject * qual;
     PyObject * tags;
@@ -526,7 +526,7 @@ typedef struct {
 static void
 BamRecord_dealloc(BamRecord *self) {
     Py_CLEAR(self->read_name);
-    Py_CLEAR(self->cigar);
+    Py_CLEAR(self->bamcigar);
     Py_CLEAR(self->seq);
     Py_CLEAR(self->qual);
     Py_CLEAR(self->tags);
@@ -588,7 +588,7 @@ BamRecord_init(BamRecord *self, PyObject *args, PyObject *kwargs) {
     self->next_pos = next_position;
     self->tlen = 0;
     self->read_name = read_name;
-    self->cigar = PyBytes_FromStringAndSize("", 0);
+    self->bamcigar = BamCigar_FromPointerAndSize(NULL, 0);
     self->seq = PyBytes_FromStringAndSize("", 0);
     self->qual = PyBytes_FromStringAndSize("", 0);
     self->tags = PyBytes_FromStringAndSize("", 0);
@@ -617,7 +617,7 @@ static PyMemberDef BamRecord_members[] = {
     {"_next_pos", T_INT, offsetof(BamRecord, next_pos), READONLY},
     {"_tlen", T_INT, offsetof(BamRecord, tlen), READONLY},
     {"_read_name", T_OBJECT_EX, offsetof(BamRecord, read_name), READONLY},
-    {"_cigar", T_OBJECT_EX, offsetof(BamRecord, cigar), READONLY},
+    {"_cigar", T_OBJECT_EX, offsetof(BamRecord, bamcigar), READONLY},
     {"_seq", T_OBJECT_EX, offsetof(BamRecord, seq), READONLY},
     {"_qual", T_OBJECT_EX, offsetof(BamRecord, qual), READONLY},
     {"_tags", T_OBJECT_EX, offsetof(BamRecord, tags), READONLY},
@@ -745,7 +745,7 @@ static PyObject *
 BamRecord_get_cigar(BamRecord * self, void * closure) {
     if (self->n_cigar_op == 2) {
         // Initiate CG tag check
-        uint32_t * cigar = (uint32_t *)PyBytes_AS_STRING(self->cigar);
+        uint32_t * cigar = BamCigar_GET_CIGAR(self->bamcigar);
         if ((bam_cigar_op(cigar[0]) == BAM_CSOFT_CLIP) && 
             (bam_cigar_oplen(cigar[0]) == self->l_seq)) {
                 PyErr_SetString(PyExc_NotImplementedError, 
@@ -753,8 +753,8 @@ BamRecord_get_cigar(BamRecord * self, void * closure) {
                 return NULL;
             }
     }
-    Py_INCREF(self->cigar);
-    return BamCigar_FromBytesAndSize(self->cigar, self->n_cigar_op);
+    Py_INCREF(self->bamcigar);
+    return (PyObject *)self->bamcigar;
 }
 
 static int 
@@ -764,15 +764,15 @@ BamRecord_set_cigar(BamRecord * self, BamCigar * new_cigar, void * closure) {
             Py_TYPE(new_cigar)->tp_name);
         return -1; 
     }
-    if (new_cigar->n_cigar_op > 65536) {
+    if (Py_SIZE(new_cigar) > 65536) {
         PyErr_SetString(PyExc_NotImplementedError, 
             "Support for cigars longer than 65536 has not yet been implemented.");
         return -1;
     }
-    PyObject * tmp = self->cigar;
-    Py_INCREF(new_cigar->raw);
-    self->cigar = new_cigar->raw;
-    self->n_cigar_op = new_cigar->n_cigar_op;
+    PyObject * tmp = self->bamcigar;
+    Py_INCREF(new_cigar);
+    self->bamcigar = (PyObject *)new_cigar;
+    self->n_cigar_op = Py_SIZE(new_cigar);
     Py_DECREF(tmp);
     return 0;
 }
@@ -889,9 +889,9 @@ BamRecord_to_ptr(BamRecord *self, char * dest) {
     // Terminate read_name with NULL byte
     dest[cursor] = 0; cursor += 1;
 
-    Py_ssize_t cigar_size = PyBytes_GET_SIZE(self->cigar);
-    memcpy(dest + cursor, PyBytes_AS_STRING(self->cigar), cigar_size);
-    cursor += cigar_size;
+    Py_ssize_t cigar_char_size = Py_SIZE(self->bamcigar) * sizeof(uint32_t);
+    memcpy(dest + cursor, BamCigar_GET_CIGAR(self->bamcigar), cigar_char_size);
+    cursor += cigar_char_size;
 
     Py_ssize_t seq_size = PyBytes_GET_SIZE(self->seq);
     memcpy(dest + cursor, PyBytes_AS_STRING(self->seq), seq_size);
@@ -1092,7 +1092,7 @@ BamIterator_iternext(BamIterator *self){
     BamRecord * bam_record = PyObject_New(BamRecord, &BamRecord_Type);
     bam_record->read_name = NULL;
     bam_record->seq = NULL;
-    bam_record->cigar = NULL;
+    bam_record->bamcigar = NULL;
     bam_record->qual = NULL;
     bam_record->tags = NULL;
 
@@ -1119,8 +1119,8 @@ BamIterator_iternext(BamIterator *self){
     self->pos += bam_record->l_read_name;
 
     Py_ssize_t cigar_length = bam_record->n_cigar_op * sizeof(uint32_t);
-    bam_record->cigar = PyBytes_FromStringAndSize(
-        self->buf + self->pos, cigar_length);
+    bam_record->bamcigar = BamCigar_FromPointerAndSize(
+        (uint32_t *)(self->buf + self->pos), bam_record->n_cigar_op);
     self->pos += cigar_length;
 
     Py_ssize_t seq_length = (bam_record->l_seq + 1) / 2;
