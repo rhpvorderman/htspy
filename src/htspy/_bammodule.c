@@ -24,13 +24,15 @@
 
 #include "_conversions.h"
 
+// Py_SET_SIZE, Py_SET_REFCNT and Py_SET_TYPE where all introduced and 
+// recommended in Python 3.9
 #if (PY_VERSION_HEX > 0x03090000)
     #define PyObject_SET_REFCOUNT(op, count) Py_SET_REFCNT(op, count)
     #define BamCigar_SET_SIZE(op, size) Py_SET_SIZE(op, size)
     #define BamCigar_SET_TYPE(op) Py_SET_TYPE(op, &BamCigar_Type)
 #else 
     #define PyObject_SET_REFCOUNT(op, count) Py_REFCNT(op) = count
-    #define BamCigar_SET_SIZE(op, size) Py_SIZE(op) = count
+    #define BamCigar_SET_SIZE(op, size) Py_SIZE(op) = size
     #define BamCigar_SET_TYPE(op) Py_TYPE(op) = &BamCigar_Type
 #endif
 #define BAM_CIGAR_MAX_COUNT 0xFFFFFFF
