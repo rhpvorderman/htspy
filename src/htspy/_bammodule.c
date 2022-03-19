@@ -616,7 +616,6 @@ static PyMemberDef BamRecord_members[] = {
     {"_next_refID", T_INT, offsetof(BamRecord, next_refID), READONLY},
     {"_next_pos", T_INT, offsetof(BamRecord, next_pos), READONLY},
     {"_tlen", T_INT, offsetof(BamRecord, tlen), READONLY},
-    {"_read_name", T_OBJECT_EX, offsetof(BamRecord, read_name), READONLY},
     {"_cigar", T_OBJECT_EX, offsetof(BamRecord, bamcigar), READONLY},
     {"_seq", T_OBJECT_EX, offsetof(BamRecord, seq), READONLY},
     {"_qual", T_OBJECT_EX, offsetof(BamRecord, qual), READONLY},
@@ -643,51 +642,19 @@ static PyMemberDef BamRecord_members[] = {
 
 // PROPERTIES
 
-PyDoc_STRVAR(BamRecord_query_name_doc,
-"The name of the aligned read as a string.\n"
-"WARNING: this attribute is a property that converts 'read_name' \n"
-"to ASCII For faster access use the 'read_name' attribute which \n"
-"is an ASCII-encoded bytes object.");
+PyDoc_STRVAR(BamRecord__read_name_doc,
+"The name of the aligned read as an ASCII encoded bytes object.\n\n"
+"This is the underlying property in the BamRecord object. read_name converts\n"
+"this property upon access to a string.");
 
 static PyObject * 
-BamRecord_get_query_name(BamRecord * self, void* closure) 
-{
-    return PyUnicode_FromEncodedObject(self->read_name, "ascii", "strict");
-}
-
-static int 
-BamRecord_set_query_name(BamRecord * self, PyObject * new_qname, void* closure) 
-{
-    PyObject * new_read_name = PyUnicode_AsASCIIString(new_qname);
-    if (new_read_name == NULL)
-        return -1;
-    Py_ssize_t read_name_size = PyBytes_GET_SIZE(new_read_name);
-    if (read_name_size > 254) {
-        PyErr_SetString(PyExc_ValueError, 
-            "read_name may not be larger than 254 characters.");
-        Py_DecRef(new_read_name);
-        return -1;
-    }
-    PyObject * old_read_name = self->read_name;
-    self->read_name = new_read_name;
-    Py_DECREF(old_read_name);
-    uint8_t old_l_read_name = self->l_read_name;
-    self->l_read_name = (uint8_t)read_name_size + 1;
-    self->block_size = self->block_size + self->l_read_name - old_l_read_name;
-    return 0;
-}
-
-PyDoc_STRVAR(BamRecord_read_name_doc,
-"The name of the aligned read as an ASCII encoded bytes object.\n");
-
-static PyObject * 
-BamRecord_get_read_name(BamRecord * self, void* closure) {
+BamRecord_get__read_name(BamRecord * self, void* closure) {
     Py_INCREF(self->read_name);
     return self->read_name;
 }
 
 static int 
-BamRecord_set_read_name(BamRecord * self, PyObject * new_read_name, void* closure) 
+BamRecord_set__read_name(BamRecord * self, PyObject * new_read_name, void* closure) 
 {
     if (!PyBytes_CheckExact(new_read_name)){
         PyErr_SetString(PyExc_TypeError, "read_name must be a bytes object");
@@ -708,6 +675,26 @@ BamRecord_set_read_name(BamRecord * self, PyObject * new_read_name, void* closur
     self->l_read_name = (uint8_t)read_name_size + 1;
     self->block_size = self->block_size + self->l_read_name - old_l_read_name;
     return 0;
+}
+
+PyDoc_STRVAR(BamRecord_read_name_doc,
+"The name of the aligned read as a string.\n");
+
+static PyObject * 
+BamRecord_get_read_name(BamRecord * self, void* closure) 
+{
+    return PyUnicode_FromEncodedObject(self->read_name, "ascii", "strict");
+}
+
+static int 
+BamRecord_set_read_name(BamRecord * self, PyObject * new_qname, void* closure) 
+{
+    PyObject * new_read_name = PyUnicode_AsASCIIString(new_qname);
+    if (new_read_name == NULL)
+        return -1;
+    int ret = BamRecord_set__read_name(self, new_read_name, closure);
+    Py_DECREF(new_read_name);
+    return ret;
 }
 
 PyDoc_STRVAR(BamRecord_tags_doc,
@@ -833,10 +820,10 @@ PyDoc_STRVAR(BamRecord_is_supplementary_doc,
 GET_FLAG_PROP(BamRecord_is_supplementary, BAM_FSUPPLEMENTARY)
 
 static PyGetSetDef BamRecord_properties[] = {
-    {"query_name", (getter)BamRecord_get_query_name, (setter)BamRecord_set_query_name, 
-     BamRecord_query_name_doc, NULL},
-    {"read_name", (getter)BamRecord_get_read_name, (setter)BamRecord_set_read_name,
+    {"read_name", (getter)BamRecord_get_read_name, (setter)BamRecord_set_read_name, 
      BamRecord_read_name_doc, NULL},
+    {"_read_name", (getter)BamRecord_get__read_name, (setter)BamRecord_set__read_name,
+     BamRecord__read_name_doc, NULL},
     {"tags", (getter)BamRecord_get_tags, (setter)BamRecord_set_tags,
      BamRecord_tags_doc, NULL},
     {"cigar", (getter)BamRecord_get_cigar, (setter)BamRecord_set_cigar,
