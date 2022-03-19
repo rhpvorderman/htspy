@@ -23,6 +23,7 @@
 #include "structmember.h"         // PyMemberDef
 
 #include "_conversions.h"
+#include "ascii-check/ascii_check.h"
 
 // Py_SET_SIZE, Py_SET_REFCNT and Py_SET_TYPE where all introduced and 
 // recommended in Python 3.9
@@ -1059,8 +1060,19 @@ BamIterator_iternext(BamIterator *self){
         return NULL;
     }
     self->pos += BAM_PROPERTIES_STRUCT_SIZE;
-    bam_record->read_name = PyUnicode_DecodeASCII(
-        self->buf + self->pos, bam_record->l_read_name -1, "strict");
+    Py_ssize_t read_name_length = bam_record->l_read_name -1;
+    // Checking for ASCII + PyUnicode_New + memcpy is slightly faster than
+    // PyUnicode_DecodeASCII. Learned from @marcelm while working on dnaio.
+    // Thanks!
+    if (!string_is_ascii(self->buf + self->pos, read_name_length)) {
+        PyErr_SetString(PyExc_UnicodeDecodeError, 
+                        "Non-ASCII characters found in read name.");
+        Py_DECREF(bam_record);
+        return NULL;
+    };
+    bam_record->read_name = PyUnicode_New(read_name_length, 127);
+    memcpy(PyUnicode_DATA(bam_record->read_name), self->buf + self->pos,
+                          read_name_length);
     self->pos += bam_record->l_read_name;
 
     Py_ssize_t cigar_length = bam_record->n_cigar_op * sizeof(uint32_t);

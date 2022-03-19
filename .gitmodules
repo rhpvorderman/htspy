@@ -1,0 +1,3 @@
+[submodule "src/htspy/ascii-check"]
+	path = src/htspy/ascii-check
+	url = https://github.com/rhpvorderman/ascii-check.git
