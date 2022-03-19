@@ -23,7 +23,7 @@
 #include "structmember.h"         // PyMemberDef
 
 #include "_conversions.h"
-#include "ascii-check/ascii_check_short.h"
+#include "ascii_check_short.h"
 
 // Py_SET_SIZE, Py_SET_REFCNT and Py_SET_TYPE where all introduced and 
 // recommended in Python 3.9
