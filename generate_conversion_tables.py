@@ -1,3 +1,6 @@
+import io
+
+
 def character_to_bam_op_table():
     table = [str(-1) for _ in range(256)]
     table[ord("M")] = "BAM_CMATCH"
@@ -13,17 +16,27 @@ def character_to_bam_op_table():
     return table
 
 
+def make_256_table(variable_name, table, row_size = 16):
+    out = io.StringIO()
+    out.write(variable_name + ' = {\n    ')
+    i = 0
+    for i, literal in enumerate(table):
+        if i % row_size == 0 and i != 0:
+            out.write(f" // {(i // row_size - 1) * row_size}-{i - 1}\n    ")
+        out.write(literal.rjust(2, " ") + ", ")
+    out.write(f" // {(i // row_size) * row_size}-{i}\n")
+    return out.getvalue()
+
+
 def main():
-    with open("src/htspy/_conversions.h", "wt") as out:
+    with open("src/htspy/_conversions.h", "wt", encoding="utf-8") as out:
         out.write('#include "stdint.h"\n')
         out.write('#include "htslib/sam.h"\n')
         out.write('\n')
-        out.write('static const char bam_cigar_table[256] = {\n    ')
-        for i, literal in enumerate(character_to_bam_op_table()):
-            if i % 16 == 0 and i != 0:
-                out.write(f" // {(i // 16 - 1) * 16}-{i - 1}\n    ")
-            out.write(literal.rjust(2, " ") + ", ")
-        out.write(f" // {(i // 16) * 16}-{i}\n")
+        out.write(make_256_table(
+            "static const char bam_cigar_table[256]",
+            character_to_bam_op_table())
+        )
         out.write("};\n")
 
 
