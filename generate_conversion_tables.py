@@ -16,11 +16,25 @@ def character_to_bam_op_table():
     return table
 
 
+BASE_CODES = "=ACMGRSVTWYHKDBN"
+
+
 def nucleotide_to_number_table():
-    base_codes = "=ACMGRSVTWYHKDBN"
     table = [str(-1) for _ in range(256)]
-    for i, nuc in enumerate(base_codes):
+    for i, nuc in enumerate(BASE_CODES):
         table[ord(nuc)] = i
+    return table
+
+
+def number_to_nucleotide_table():
+    table = ["" for _ in range(256)]
+    for i, nuc in enumerate(BASE_CODES):
+        for j, nuc2 in enumerate(BASE_CODES):
+            index = (i << 4) | j
+            # Using single quotes the nucleotides will be interpreted as a
+            # literal byte representation.
+            bases_literal = f"'{nuc}{nuc2}'"
+            table[index] = bases_literal
     return table
 
 
@@ -52,7 +66,11 @@ def main():
             nucleotide_to_number_table()
         ))
         out.write('\n')
-
+        out.write(make_256_table(
+            "static const uint16_t number_to_nucleotide_pair[256]",
+            number_to_nucleotide_table(),
+            row_size=12
+        ))
 
 
 if __name__ == "__main__":
