@@ -16,6 +16,14 @@ def character_to_bam_op_table():
     return table
 
 
+def nucleotide_to_number_table():
+    base_codes = "=ACMGRSVTWYHKDBN"
+    table = [str(-1) for _ in range(256)]
+    for i, nuc in enumerate(base_codes):
+        table[ord(nuc)] = i
+    return table
+
+
 def make_256_table(variable_name, table, row_size = 16):
     out = io.StringIO()
     out.write(variable_name + ' = {\n    ')
@@ -23,8 +31,9 @@ def make_256_table(variable_name, table, row_size = 16):
     for i, literal in enumerate(table):
         if i % row_size == 0 and i != 0:
             out.write(f" // {(i // row_size - 1) * row_size}-{i - 1}\n    ")
-        out.write(literal.rjust(2, " ") + ", ")
+        out.write(str(literal).rjust(2, " ") + ", ")
     out.write(f" // {(i // row_size) * row_size}-{i}\n")
+    out.write("};\n")
     return out.getvalue()
 
 
@@ -37,7 +46,13 @@ def main():
             "static const char bam_cigar_table[256]",
             character_to_bam_op_table())
         )
-        out.write("};\n")
+        out.write('\n')
+        out.write(make_256_table(
+            "static const char nucleotide_to_number[256]",
+            nucleotide_to_number_table()
+        ))
+        out.write('\n')
+
 
 
 if __name__ == "__main__":
