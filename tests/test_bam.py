@@ -13,7 +13,7 @@ def test_bam_parsing():
     mapq = 99
     bin = 1001  # TODO get realistic value
     flag = BAM_FUNMAP
-    read_name = "my_forward_read/1"
+    read_name = b"my_forward_read/1"
     l_read_name = len(read_name) + 1
     l_seq = 7
     # Seq consists of 7 AA characters
@@ -30,9 +30,8 @@ def test_bam_parsing():
                              reference_id, pos, l_read_name, mapq, bin,
                              n_cigar_op, flag, l_seq, next_reference_id,
                              next_pos, tlen)
-    bam_record_without_block_size = (bam_struct + read_name.encode('ascii') +
-                                     b"\x00" + cigar.tobytes() + seq + quals
-                                     + tags)
+    bam_record_without_block_size = (bam_struct + read_name + b"\x00" +
+                                     cigar.tobytes() + seq + quals + tags)
     block_size = len(bam_record_without_block_size)
     bam_record = struct.pack("<I", block_size) + bam_record_without_block_size
     parsed_record = next(bam_iterator(bam_record))

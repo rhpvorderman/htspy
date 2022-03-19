@@ -53,8 +53,8 @@ class BamRecord:
     _next_refID: int
     _next_pos: int
     _tlen: int
-    _read_name: str
-    _cigar: Cigar
+    _read_name: bytes
+    _cigar: bytes
     _seq: bytes
     _qual: bytes
     _tags: bytes
@@ -71,7 +71,10 @@ class BamRecord:
     def cigar(self) -> Cigar: ...
 
     @property
-    def read_name(self) -> str: ...
+    def query_name(self) -> bytes: ...
+
+    @property
+    def read_name(self) -> bytes: ...
 
     @property
     def tags(self) -> bytes: ...
