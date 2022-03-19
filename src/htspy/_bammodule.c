@@ -856,6 +856,36 @@ static PyGetSetDef BamRecord_properties[] = {
 };
 
 // METHODS
+PyDoc_STRVAR(BamRecord_get_sequence__doc__,
+"Convert the encoded sequence to an ASCII-string");
+
+#define BAMRECORD_GET_SEQUENCE_METHODDEF \
+    {"get_sequence", (PyCFunction)(void(*)(void))BamRecord_get_sequence, \ 
+     METH_NOARGS, BamRecord_get_sequence__doc__}
+
+static PyObject *
+BamRecord_get_sequence(BamRecord * self, PyObject * Py_UNUSED(ignore)) {
+    uint32_t length = self->l_seq;
+    Py_ssize_t encoded_length = PyBytes_GET_SIZE(self->seq);
+    PyObject * retval = PyUnicode_New(length, 127);
+    if (retval == NULL) {
+        return PyErr_NoMemory();
+    }
+    uint8_t * encoded_sequence = (uint8_t *)self->seq;
+    uint16_t * decoded_sequence = (uint16_t *)PyUnicode_DATA(retval);
+    Py_ssize_t i = 0;
+    while (i < encoded_length) {
+        decoded_sequence[i] = number_to_nucleotide_pair[encoded_sequence[i]];
+        i += 1;
+    }
+    if (length & 1) {
+        // We will have overshoot and have overwritten the terminating NULL
+        // byte when the decoded sequence length is an odd number.
+        decoded_sequence[length] = 0;
+    }
+    return retval;
+}
+
 PyDoc_STRVAR(BamRecord_to_bytes__doc__,
 "Return the BAM record as a bytesobject that can be written into a file.");
 
@@ -908,6 +938,7 @@ BamRecord_to_bytes(BamRecord *self, PyObject *NoArgs)
 
 static PyMethodDef BamRecord_methods[] = {
     BAMRECORD_TO_BYTES_METHODDEF,
+    BAMRECORD_GET_SEQUENCE_METHODDEF,
     {NULL}
 };
 
