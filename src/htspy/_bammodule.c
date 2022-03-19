@@ -23,7 +23,6 @@
 #include "structmember.h"         // PyMemberDef
 
 #include "_conversions.h"
-#include "ascii_check_short.h"
 
 // Py_SET_SIZE, Py_SET_REFCNT and Py_SET_TYPE where all introduced and 
 // recommended in Python 3.9
@@ -514,11 +513,11 @@ typedef struct {
     int32_t tlen;
     // The compiler automatically inserts 4 padding bytes here to properly
     // align the PyObject pointers in memory.
-    PyObject * read_name;  // str, ASCII
-    PyObject * bamcigar;   // BamCigar
-    PyObject * seq;        // bytes
-    PyObject * qual;       // bytes
-    PyObject * tags;       // bytes
+    PyObject * read_name;
+    PyObject * bamcigar;
+    PyObject * seq;
+    PyObject * qual;
+    PyObject * tags;
 } BamRecord;
 
 # define BAM_PROPERTIES_STRUCT_START offsetof(BamRecord, block_size)
@@ -532,6 +531,27 @@ BamRecord_dealloc(BamRecord *self) {
     Py_CLEAR(self->qual);
     Py_CLEAR(self->tags);
     Py_TYPE(self)->tp_free((PyObject *)self);
+}
+
+// Convert an ASCII string to a bytes object if necessary.
+static inline PyObject *
+convert_to_new_bytes_reference(PyObject *obj, const char * param_name)
+{
+    if (obj == NULL) {
+        return PyBytes_FromStringAndSize("", 0);
+    }
+    if (PyBytes_CheckExact(obj)) {
+        Py_INCREF(obj);
+        return obj;
+    }
+    if (PyUnicode_CheckExact(obj)) {
+        return PyUnicode_AsASCIIString(obj);
+    }
+    PyErr_Format(PyExc_TypeError, 
+                 "'%s' expected a bytes or str object got: %s",
+                  param_name,
+                  obj->ob_type->tp_name);
+    return NULL;
 }
 
 static int
@@ -552,8 +572,10 @@ BamRecord_init(BamRecord *self, PyObject *args, PyObject *kwargs) {
         &next_reference_id, &next_position)) {
         return -1; 
     }
-    read_name = PyUnicode_New(0, 127);
-
+    read_name = convert_to_new_bytes_reference(read_name, "read_name");
+    if (read_name == NULL) {
+            return -1;
+    }
     self->refID = reference_id;
     self->pos = position;
     self->l_read_name = PyBytes_GET_SIZE(read_name) + 1;
@@ -621,8 +643,42 @@ static PyMemberDef BamRecord_members[] = {
 
 // PROPERTIES
 
+PyDoc_STRVAR(BamRecord_query_name_doc,
+"The name of the aligned read as a string.\n"
+"WARNING: this attribute is a property that converts 'read_name' \n"
+"to ASCII For faster access use the 'read_name' attribute which \n"
+"is an ASCII-encoded bytes object.");
+
+static PyObject * 
+BamRecord_get_query_name(BamRecord * self, void* closure) 
+{
+    return PyUnicode_FromEncodedObject(self->read_name, "ascii", "strict");
+}
+
+static int 
+BamRecord_set_query_name(BamRecord * self, PyObject * new_qname, void* closure) 
+{
+    PyObject * new_read_name = PyUnicode_AsASCIIString(new_qname);
+    if (new_read_name == NULL)
+        return -1;
+    Py_ssize_t read_name_size = PyBytes_GET_SIZE(new_read_name);
+    if (read_name_size > 254) {
+        PyErr_SetString(PyExc_ValueError, 
+            "read_name may not be larger than 254 characters.");
+        Py_DecRef(new_read_name);
+        return -1;
+    }
+    PyObject * old_read_name = self->read_name;
+    self->read_name = new_read_name;
+    Py_DECREF(old_read_name);
+    uint8_t old_l_read_name = self->l_read_name;
+    self->l_read_name = (uint8_t)read_name_size + 1;
+    self->block_size = self->block_size + self->l_read_name - old_l_read_name;
+    return 0;
+}
+
 PyDoc_STRVAR(BamRecord_read_name_doc,
-"The name of the aligned read as an ASCII string.\n");
+"The name of the aligned read as an ASCII encoded bytes object.\n");
 
 static PyObject * 
 BamRecord_get_read_name(BamRecord * self, void* closure) {
@@ -633,15 +689,11 @@ BamRecord_get_read_name(BamRecord * self, void* closure) {
 static int 
 BamRecord_set_read_name(BamRecord * self, PyObject * new_read_name, void* closure) 
 {
-    if (!PyUnicode_CheckExact(new_read_name)){
-        PyErr_SetString(PyExc_TypeError, "read_name must be a str object");
+    if (!PyBytes_CheckExact(new_read_name)){
+        PyErr_SetString(PyExc_TypeError, "read_name must be a bytes object");
         return -1;
     }
-    if (!PyUnicode_IS_COMPACT_ASCII(new_read_name)) {
-        PyErr_SetString(PyExc_ValueError, "Read name must be a valid ASCII string.");
-        return -1;
-    }
-    Py_ssize_t read_name_size = PyUnicode_GET_LENGTH(new_read_name);
+    Py_ssize_t read_name_size = PyBytes_GET_SIZE(new_read_name);
     if (read_name_size > 254) {
         PyErr_SetString(PyExc_ValueError, 
             "read_name may not be larger than 254 characters.");
@@ -781,6 +833,8 @@ PyDoc_STRVAR(BamRecord_is_supplementary_doc,
 GET_FLAG_PROP(BamRecord_is_supplementary, BAM_FSUPPLEMENTARY)
 
 static PyGetSetDef BamRecord_properties[] = {
+    {"query_name", (getter)BamRecord_get_query_name, (setter)BamRecord_set_query_name, 
+     BamRecord_query_name_doc, NULL},
     {"read_name", (getter)BamRecord_get_read_name, (setter)BamRecord_set_read_name,
      BamRecord_read_name_doc, NULL},
     {"tags", (getter)BamRecord_get_tags, (setter)BamRecord_set_tags,
@@ -828,8 +882,8 @@ BamRecord_to_ptr(BamRecord *self, char * dest) {
          BAM_PROPERTIES_STRUCT_SIZE);
     Py_ssize_t cursor = BAM_PROPERTIES_STRUCT_SIZE;
     
-    Py_ssize_t read_name_size = PyUnicode_GET_LENGTH(self->read_name);
-    memcpy(dest + cursor, PyUnicode_DATA(self->read_name), read_name_size);
+    Py_ssize_t read_name_size = PyBytes_GET_SIZE(self->read_name);
+    memcpy(dest + cursor, PyBytes_AS_STRING(self->read_name), read_name_size);
     cursor += read_name_size;
 
     // Terminate read_name with NULL byte
@@ -1060,19 +1114,8 @@ BamIterator_iternext(BamIterator *self){
         return NULL;
     }
     self->pos += BAM_PROPERTIES_STRUCT_SIZE;
-    Py_ssize_t read_name_length = bam_record->l_read_name -1;
-    // Checking for ASCII + PyUnicode_New + memcpy is slightly faster than
-    // PyUnicode_DecodeASCII. Learned from @marcelm while working on dnaio.
-    // Thanks!
-    if (!string_is_ascii(self->buf + self->pos, read_name_length)) {
-        PyErr_SetString(PyExc_UnicodeDecodeError, 
-                        "Non-ASCII characters found in read name.");
-        Py_DECREF(bam_record);
-        return NULL;
-    };
-    bam_record->read_name = PyUnicode_New(read_name_length, 127);
-    memcpy(PyUnicode_DATA(bam_record->read_name), self->buf + self->pos,
-                          read_name_length);
+    bam_record->read_name = PyBytes_FromStringAndSize(
+        self->buf + self->pos, bam_record->l_read_name -1);
     self->pos += bam_record->l_read_name;
 
     Py_ssize_t cigar_length = bam_record->n_cigar_op * sizeof(uint32_t);
