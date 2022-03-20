@@ -31,10 +31,9 @@ def number_to_nucleotide_table():
     for i, nuc in enumerate(BASE_CODES):
         for j, nuc2 in enumerate(BASE_CODES):
             index = (i << 4) | j
-            # Using single quotes the nucleotides will be interpreted as a
-            # literal byte representation.
-            bases_literal = f"'{nuc}{nuc2}'"
-            table[index] = bases_literal
+            bases_literal = f"{nuc}{nuc2}"
+            bases_hex = f"0x{bases_literal.encode('ascii').hex()}"
+            table[index] = bases_hex
     return table
 
 
@@ -69,7 +68,7 @@ def main():
         out.write(make_256_table(
             "static const uint16_t number_to_nucleotide_pair[256]",
             number_to_nucleotide_table(),
-            row_size=12
+            row_size=8
         ))
 
 
