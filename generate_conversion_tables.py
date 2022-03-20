@@ -31,7 +31,8 @@ def number_to_nucleotide_table():
     for i, nuc in enumerate(BASE_CODES):
         for j, nuc2 in enumerate(BASE_CODES):
             index = (i << 4) | j
-            bases_literal = f"{nuc}{nuc2}"
+            # The second base is stored in shifted position.
+            bases_literal = f"{nuc2}{nuc}"
             bases_hex = f"0x{bases_literal.encode('ascii').hex()}"
             table[index] = bases_hex
     return table

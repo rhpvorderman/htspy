@@ -16,8 +16,8 @@ def test_bam_parsing():
     read_name = b"my_forward_read/1"
     l_read_name = len(read_name) + 1
     l_seq = 7
-    # Seq consists of 7 AA characters
-    seq = b'\x11\x11\x11\x10'
+    # Seq: GATTACA
+    seq = b'\x41\x88\x12\x10'
     # Quality is 35 for all bases
     quals = b'#######'
     # 4 bases match, 3 bases differ.
@@ -53,3 +53,4 @@ def test_bam_parsing():
     assert parsed_record._qual == quals
     assert parsed_record._tags == tags
     assert parsed_record.cigar == Cigar("4M3X")
+    assert parsed_record.get_sequence() == "GATTACA"

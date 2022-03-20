@@ -866,21 +866,29 @@ PyDoc_STRVAR(BamRecord_get_sequence__doc__,
 static PyObject *
 BamRecord_get_sequence(BamRecord * self, PyObject * Py_UNUSED(ignore)) {
     uint32_t length = self->l_seq;
-    Py_ssize_t encoded_length = PyBytes_GET_SIZE(self->seq);
     PyObject * retval = PyUnicode_New(length, 127);
     if (retval == NULL) {
         return PyErr_NoMemory();
     }
-    uint8_t * encoded_sequence = (uint8_t *)self->seq;
-    uint16_t * decoded_sequence = (uint16_t *)PyUnicode_DATA(retval);
+    uint8_t * decoded_sequence = (uint8_t *)PyUnicode_DATA(retval);
+    uint16_t * decoded_sequence_pairs = (uint16_t *)decoded_sequence;
+    uint8_t * encoded_sequence = (uint8_t *)PyBytes_AS_STRING(self->seq);
+    Py_ssize_t encoded_length = PyBytes_GET_SIZE(self->seq);
     Py_ssize_t i = 0;
+    uint8_t index;
     while (i < encoded_length) {
-        decoded_sequence[i] = number_to_nucleotide_pair[encoded_sequence[i]];
+        index = encoded_sequence[i];
+        decoded_sequence_pairs[i] = number_to_nucleotide_pair[index];
         i += 1;
     }
     if (length & 1) {
-        // We will have overshoot and have overwritten the terminating NULL
-        // byte when the decoded sequence length is an odd number.
+        // When length is odd, say 7, then 4 encoded bytes are needed to 
+        // store the sequence. This leads to 4 decoded pairs and thus 8 bytes.
+        // Since we only requested 7 bytes when creating the return string, 
+        // the above algorithm overshoots slightly. This is not a problem, 
+        // since CPython always allocates 1 byte of extra space for the 
+        // terminating NULL byte. This NULL byte will have been overwritten, 
+        // so we have to put it back.
         decoded_sequence[length] = 0;
     }
     return retval;
