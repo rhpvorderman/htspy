@@ -860,7 +860,7 @@ PyDoc_STRVAR(BamRecord_get_sequence__doc__,
 "Convert the encoded sequence to an ASCII-string");
 
 #define BAMRECORD_GET_SEQUENCE_METHODDEF \
-    {"get_sequence", (PyCFunction)(void(*)(void))BamRecord_get_sequence, \ 
+    {"get_sequence", (PyCFunction)(void(*)(void))BamRecord_get_sequence, \
      METH_NOARGS, BamRecord_get_sequence__doc__}
 
 static PyObject *
