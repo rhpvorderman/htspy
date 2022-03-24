@@ -986,10 +986,12 @@ BamRecord_set_sequence(BamRecord *self, PyObject *const *args, Py_ssize_t nargs)
     PyObject * old_sequence = self->seq;
     PyObject * old_qualities = self->qual; 
     Py_ssize_t old_l_seq = self->l_seq;
+    Py_ssize_t old_encoded_length = (self->l_seq + 1) / 2;
     self->seq = encoded_sequence;
     self->qual = new_qualities;
     self->l_seq = sequence_length;
-    self->block_size = self->block_size + sequence_length - old_l_seq;
+    self->block_size = self->block_size + sequence_length + encoded_length - 
+        (old_l_seq + old_encoded_length);
     Py_DECREF(old_sequence);
     Py_DECREF(old_qualities);
     Py_RETURN_NONE;

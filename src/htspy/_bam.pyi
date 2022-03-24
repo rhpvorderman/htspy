@@ -18,7 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from typing import Iterable, Iterator, Tuple
+from typing import Iterable, Iterator, Optional, Tuple
 
 class Cigar:
     def __init__(self, cigar_string: str): ...
@@ -65,17 +65,15 @@ class BamRecord:
     flag: int
     next_position: int
     template_length: int
+    read_name: str
     qualities: bytes
+    cigar: Cigar
+    tags: bytes
 
-    @property
-    def cigar(self) -> Cigar: ...
+    def get_sequence(self) -> str: ...
 
-    @property
-    def read_name(self) -> str: ...
-
-    @property
-    def tags(self) -> bytes: ...
-
+    def set_sequence(self, sequence: str,
+                           qualities: Optional[bytes] = None, /) -> None: ...
     def to_bytes(self) -> bytes: ...
 
 

@@ -93,3 +93,40 @@ def test_set_sequence_no_qual(empty_bam):
     assert empty_bam.get_sequence() == "GATTACA"
     assert empty_bam._seq == b'\x41\x88\x12\x10'
     assert empty_bam.qualities == b"\xff\xff\xff\xff\xff\xff\xff"
+
+
+def test_set_sequence_with_qual(empty_bam):
+    old_block_size = empty_bam._block_size
+    empty_bam.set_sequence("GATTACA", b"\x1f\x1f\x1f\x1f\x1f\x1f\x1f")
+    assert empty_bam.get_sequence() == "GATTACA"
+    assert empty_bam.qualities == b"\x1f\x1f\x1f\x1f\x1f\x1f\x1f"
+    assert empty_bam._block_size == \
+           old_block_size + len(empty_bam._seq) + len(empty_bam.qualities)
+
+def test_set_sequence_qual_wrong_type(empty_bam):
+    with pytest.raises(TypeError) as error:
+        empty_bam.set_sequence("GATTACA", "HFFFHF")
+    assert error.match("qualities must be of type bytes")
+
+def test_set_sequence_qual_wrong_length(empty_bam):
+    with pytest.raises(ValueError) as error:
+        empty_bam.set_sequence("GATTACA", b"FFFHF")
+    assert error.match("sequence and qualities must have the same length")
+
+
+def test_set_sequence_seq_wrong_type(empty_bam):
+    with pytest.raises(TypeError) as error:
+        empty_bam.set_sequence(b"GATTACA")
+    assert error.match("sequence must be of type str")
+
+
+def test_wrong_iupac_character_first_in_pair(empty_bam):
+    with pytest.raises(ValueError) as error:
+        empty_bam.set_sequence("XA")
+    error.match("Not a IUPAC character: X")
+
+
+def test_wrong_iupac_character_second_in_pair(empty_bam):
+    with pytest.raises(ValueError) as error:
+        empty_bam.set_sequence("AX")
+    error.match("Not a IUPAC character: X")
