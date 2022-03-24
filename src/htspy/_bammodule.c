@@ -876,6 +876,10 @@ BamRecord_get_sequence(BamRecord * self, PyObject * Py_UNUSED(ignore)) {
     Py_ssize_t encoded_length = PyBytes_GET_SIZE(self->seq);
     Py_ssize_t i = 0;
     uint8_t index;
+    // The memory address should be aligned at an even number. Because uint16_t
+    // uses two bytes. Since python strings at UCS4 (4 bytes) this should never
+    // pose a problem.
+    assert(!((size_t)decoded_sequence_pairs & 1));
     while (i < encoded_length) {
         index = encoded_sequence[i];
         decoded_sequence_pairs[i] = number_to_nucleotide_pair_le[index];
