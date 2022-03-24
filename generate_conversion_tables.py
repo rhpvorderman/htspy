@@ -24,6 +24,8 @@ def nucleotide_to_number_table():
     table = [str(-1) for _ in range(256)]
     for i, nuc in enumerate(BASE_CODES):
         table[ord(nuc)] = i
+    # Make sure a NULL byte returns a NULL byte.
+    table[0] = 0
     return table
 
 

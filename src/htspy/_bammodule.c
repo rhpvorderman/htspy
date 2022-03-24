@@ -898,6 +898,102 @@ BamRecord_get_sequence(BamRecord * self, PyObject * Py_UNUSED(ignore)) {
     return retval;
 }
 
+PyDoc_STRVAR(BamRecord_set_sequence__doc__,
+"Encode an ASCII-string containing IUPAC nucleotides and set it in the BAM record.");
+
+#define BAMRECORD_SET_SEQUENCE_METHODDEF \
+    {"set_sequence", (PyCFunction)(void(*)(void))BamRecord_set_sequence, \
+     METH_FASTCALL, BamRecord_set_sequence__doc__}
+
+static PyObject *
+BamRecord_set_sequence(BamRecord *self, PyObject *const *args, Py_ssize_t nargs) {
+    if (nargs != 1 || nargs != 2) {
+        PyErr_Format(PyExc_TypeError,
+                     "set_sequence expected at least 1 argument "
+                     "and at most 2 arguments, got %ld", nargs);
+        return NULL;
+    }
+    PyObject * qualities = NULL;
+    PyObject * sequence = args[0];
+    if (!PyUnicode_CheckExact(sequence)) {
+        PyErr_Format(PyExc_TypeError, "sequence must be of type str, got %s",
+                     Py_TYPE(sequence)->tp_name);
+        return NULL;
+    }
+    if (!PyUnicode_IS_COMPACT_ASCII(sequence)) {
+        PyErr_SetString(PyExc_ValueError, 
+                        "sequence must only contain ASCII characters");
+        return NULL;
+    }
+
+    Py_ssize_t sequence_length = PyUnicode_GET_LENGTH(sequence);
+    PyObject * new_qualities;
+    if (nargs == 2) {
+        qualities = args[1];
+        if (!PyBytes_CheckExact(qualities)) {
+            PyErr_Format(PyExc_TypeError, 
+                         "qualities must be of type bytes, got %s",
+                         Py_TYPE(qualities)->tp_name);
+            return NULL;
+        } 
+        if (PyBytes_GET_SIZE(qualities) != sequence_length) {
+            PyErr_SetString(PyExc_ValueError, 
+                "sequence and qualities must have the same length");
+            return NULL;
+        }
+        new_qualities = qualities;
+        Py_INCREF(new_qualities);
+    } else {
+        // From the spec: "When base qualities are omitted but the sequence is
+        // not, qual is filled with 0xFF bytes"
+        new_qualities = PyBytes_FromStringAndSize(NULL, sequence_length);
+        memset(PyBytes_AS_STRING(new_qualities), 0xFF, sequence_length);
+    }
+    Py_ssize_t encoded_length = sequence_length + 1 / 2;
+    PyObject * encoded_sequence = PyBytes_FromStringAndSize(NULL, encoded_length);
+    if (encoded_sequence == NULL) {
+        Py_DECREF(new_qualities);
+        return PyErr_NoMemory();
+    }
+    Py_ssize_t i = 0;
+    Py_ssize_t j = 0;
+    uint8_t * sequence_chars = (uint8_t *)PyUnicode_DATA(sequence);
+    uint8_t * encoded_sequence_chars = (uint8_t *)PyBytes_AS_STRING(encoded_sequence);
+    int8_t iupac_int_first;
+    int8_t iupac_int_second;
+    while (i < sequence_length) {
+        iupac_int_first = nucleotide_to_number[sequence_chars[i]];
+        if (iupac_int_first == -1) {
+            PyErr_Format(PyExc_ValueError, "Not a IUPAC character: %c", 
+                         sequence_chars[i]);
+            Py_DECREF(encoded_sequence); 
+            Py_DECREF(new_qualities); 
+            return NULL;
+        }
+        i += 1;
+        iupac_int_second = nucleotide_to_number[sequence_chars[i]];
+                if (iupac_int_first == -1) {
+            PyErr_Format(PyExc_ValueError, "Not a IUPAC character: %c", 
+                         sequence_chars[i]);
+            Py_DECREF(encoded_sequence); 
+            Py_DECREF(new_qualities);  
+            return NULL;
+        }
+        encoded_sequence_chars[j] = ((iupac_int_first << 4) | iupac_int_second);
+        j += 1;
+    }
+    PyObject * old_sequence = self->seq;
+    PyObject * old_qualities = self->qual; 
+    Py_ssize_t old_l_seq = self->l_seq;
+    self->seq = encoded_sequence;
+    self->qual = new_qualities;
+    self->l_seq = sequence_length;
+    self->block_size = self->block_size + sequence_length - old_l_seq;
+    Py_DECREF(old_sequence);
+    Py_DECREF(old_qualities);
+    Py_RETURN_NONE;
+}
+
 PyDoc_STRVAR(BamRecord_to_bytes__doc__,
 "Return the BAM record as a bytesobject that can be written into a file.");
 
@@ -951,6 +1047,7 @@ BamRecord_to_bytes(BamRecord *self, PyObject *NoArgs)
 static PyMethodDef BamRecord_methods[] = {
     BAMRECORD_TO_BYTES_METHODDEF,
     BAMRECORD_GET_SEQUENCE_METHODDEF,
+    BAMRECORD_SET_SEQUENCE_METHODDEF,
     {NULL}
 };
 
