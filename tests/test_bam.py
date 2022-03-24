@@ -1,10 +1,10 @@
 import array
 import struct
 
-import pytest
-
 from htspy._bam import BAM_CDIFF, BAM_CIGAR_SHIFT, BAM_CMATCH, \
     BAM_FUNMAP, BamRecord, Cigar, bam_iterator
+
+import pytest
 
 
 @pytest.fixture(scope="function")
@@ -103,10 +103,12 @@ def test_set_sequence_with_qual(empty_bam):
     assert empty_bam._block_size == \
            old_block_size + len(empty_bam._seq) + len(empty_bam.qualities)
 
+
 def test_set_sequence_qual_wrong_type(empty_bam):
     with pytest.raises(TypeError) as error:
         empty_bam.set_sequence("GATTACA", "HFFFHF")
     assert error.match("qualities must be of type bytes")
+
 
 def test_set_sequence_qual_wrong_length(empty_bam):
     with pytest.raises(ValueError) as error:
