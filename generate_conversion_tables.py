@@ -1,4 +1,5 @@
 import io
+import struct
 
 
 def character_to_bam_op_table():
@@ -26,15 +27,14 @@ def nucleotide_to_number_table():
     return table
 
 
-def number_to_nucleotide_table():
+def number_to_nucleotide_table_little_endian():
     table = ["" for _ in range(256)]
     for i, nuc in enumerate(BASE_CODES):
         for j, nuc2 in enumerate(BASE_CODES):
             index = (i << 4) | j
-            # The second base is stored in shifted position.
-            bases_literal = f"{nuc2}{nuc}"
-            bases_hex = f"0x{bases_literal.encode('ascii').hex()}"
-            table[index] = bases_hex
+            bases_bytes = f"{nuc}{nuc2}".encode('ascii')
+            base_integer, = struct.unpack("<H", bases_bytes)
+            table[index] = hex(base_integer)
     return table
 
 
@@ -67,8 +67,8 @@ def main():
         ))
         out.write('\n')
         out.write(make_256_table(
-            "static const uint16_t number_to_nucleotide_pair[256]",
-            number_to_nucleotide_table(),
+            "static const uint16_t number_to_nucleotide_pair_le[256]",
+            number_to_nucleotide_table_little_endian(),
             row_size=8
         ))
 

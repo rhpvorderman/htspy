@@ -39,7 +39,7 @@ static const char nucleotide_to_number[256] = {
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,  // 240-255
 };
 
-static const uint16_t number_to_nucleotide_pair[256] = {
+static const uint16_t number_to_nucleotide_pair_le[256] = {
     0x3d3d, 0x413d, 0x433d, 0x4d3d, 0x473d, 0x523d, 0x533d, 0x563d,  // 0-7
     0x543d, 0x573d, 0x593d, 0x483d, 0x4b3d, 0x443d, 0x423d, 0x4e3d,  // 8-15
     0x3d41, 0x4141, 0x4341, 0x4d41, 0x4741, 0x5241, 0x5341, 0x5641,  // 16-23

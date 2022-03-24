@@ -878,7 +878,7 @@ BamRecord_get_sequence(BamRecord * self, PyObject * Py_UNUSED(ignore)) {
     uint8_t index;
     while (i < encoded_length) {
         index = encoded_sequence[i];
-        decoded_sequence_pairs[i] = number_to_nucleotide_pair[index];
+        decoded_sequence_pairs[i] = number_to_nucleotide_pair_le[index];
         i += 1;
     }
     if (length & 1) {
