@@ -1,8 +1,40 @@
 import array
 import struct
 
+import pytest
+
 from htspy._bam import BAM_CDIFF, BAM_CIGAR_SHIFT, BAM_CMATCH, \
-    BAM_FUNMAP, Cigar, bam_iterator
+    BAM_FUNMAP, BamRecord, Cigar, bam_iterator
+
+
+@pytest.fixture(scope="function")
+def empty_bam() -> BamRecord:
+    reference_id = -1
+    pos = -1
+    next_reference_id = -1
+    next_pos = -1
+    mapq = 0xff
+    bin = 0  # Incorrect but roll with this for now
+    flag = BAM_FUNMAP
+    read_name = b""
+    l_read_name = 1
+    l_seq = 0
+    seq = b''
+    quals = b''
+    cigar = b""
+    n_cigar_op = 0
+    tlen = 0
+    tags = b''
+    bam_struct = struct.pack("<iiBBHHHIiii",
+                             reference_id, pos, l_read_name, mapq, bin,
+                             n_cigar_op, flag, l_seq, next_reference_id,
+                             next_pos, tlen)
+    bam_record_without_block_size = (bam_struct + read_name + b"\x00" +
+                                     cigar + seq + quals + tags)
+    block_size = len(bam_record_without_block_size)
+    bam_record = struct.pack("<I", block_size) + bam_record_without_block_size
+    parsed_record = next(bam_iterator(bam_record))
+    return parsed_record
 
 
 def test_bam_parsing():
@@ -12,7 +44,7 @@ def test_bam_parsing():
     next_pos = -1
     mapq = 99
     bin = 1001  # TODO get realistic value
-    flag = BAM_FUNMAP
+    flag = 0
     read_name = b"my_forward_read/1"
     l_read_name = len(read_name) + 1
     l_seq = 7
@@ -54,3 +86,10 @@ def test_bam_parsing():
     assert parsed_record._tags == tags
     assert parsed_record.cigar == Cigar("4M3X")
     assert parsed_record.get_sequence() == "GATTACA"
+
+
+def test_set_sequence_no_qual(empty_bam):
+    empty_bam.set_sequence("GATTACA")
+    assert empty_bam.get_sequence() == "GATTACA"
+    assert empty_bam._seq == b'\x41\x88\x12\x10'
+    assert empty_bam.qualities == b"\xff\xff\xff\xff\xff\xff\xff"

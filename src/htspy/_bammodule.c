@@ -907,7 +907,7 @@ PyDoc_STRVAR(BamRecord_set_sequence__doc__,
 
 static PyObject *
 BamRecord_set_sequence(BamRecord *self, PyObject *const *args, Py_ssize_t nargs) {
-    if (nargs != 1 || nargs != 2) {
+    if (nargs != 1 && nargs != 2) {
         PyErr_Format(PyExc_TypeError,
                      "set_sequence expected at least 1 argument "
                      "and at most 2 arguments, got %ld", nargs);
@@ -949,7 +949,7 @@ BamRecord_set_sequence(BamRecord *self, PyObject *const *args, Py_ssize_t nargs)
         new_qualities = PyBytes_FromStringAndSize(NULL, sequence_length);
         memset(PyBytes_AS_STRING(new_qualities), 0xFF, sequence_length);
     }
-    Py_ssize_t encoded_length = sequence_length + 1 / 2;
+    Py_ssize_t encoded_length = (sequence_length + 1) / 2;
     PyObject * encoded_sequence = PyBytes_FromStringAndSize(NULL, encoded_length);
     if (encoded_sequence == NULL) {
         Py_DECREF(new_qualities);
@@ -972,13 +972,14 @@ BamRecord_set_sequence(BamRecord *self, PyObject *const *args, Py_ssize_t nargs)
         }
         i += 1;
         iupac_int_second = nucleotide_to_number[sequence_chars[i]];
-                if (iupac_int_first == -1) {
+        if (iupac_int_second == -1) {
             PyErr_Format(PyExc_ValueError, "Not a IUPAC character: %c", 
                          sequence_chars[i]);
             Py_DECREF(encoded_sequence); 
             Py_DECREF(new_qualities);  
             return NULL;
         }
+        i += 1;
         encoded_sequence_chars[j] = ((iupac_int_first << 4) | iupac_int_second);
         j += 1;
     }
