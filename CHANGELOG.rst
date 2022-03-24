@@ -9,6 +9,7 @@ Changelog
 
 0.1.0-dev
 --------------------
++ Add support for encoding/decoding sequences in the ``BamRecord`` type.
 + Implement full CIGAR string/array support in the ``Cigar`` type.
 + Implemented BAM writing capability.
 + Implemented basic BAM reading capability.
