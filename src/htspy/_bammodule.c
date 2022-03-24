@@ -683,7 +683,9 @@ PyDoc_STRVAR(BamRecord_read_name_doc,
 static PyObject * 
 BamRecord_get_read_name(BamRecord * self, void* closure) 
 {
-    return PyUnicode_FromEncodedObject(self->read_name, "ascii", "strict");
+    return PyUnicode_DecodeASCII(PyBytes_AS_STRING(self->read_name), 
+                                 PyBytes_GET_SIZE(self->read_name), 
+                                 "strict");
 }
 
 static int 
