@@ -40,7 +40,7 @@ def number_to_nucleotide_table_little_endian():
     return table
 
 
-def make_256_table(variable_name, table, row_size = 16):
+def make_table(variable_name, table, row_size = 16):
     out = io.StringIO()
     out.write(variable_name + ' = {\n    ')
     i = 0
@@ -58,17 +58,17 @@ def main():
         out.write('#include "stdint.h"\n')
         out.write('#include "htslib/sam.h"\n')
         out.write('\n')
-        out.write(make_256_table(
+        out.write(make_table(
             "static const char bam_cigar_table[256]",
             character_to_bam_op_table())
         )
         out.write('\n')
-        out.write(make_256_table(
+        out.write(make_table(
             "static const char nucleotide_to_number[256]",
             nucleotide_to_number_table()
         ))
         out.write('\n')
-        out.write(make_256_table(
+        out.write(make_table(
             "static const uint16_t number_to_nucleotide_pair_le[256]",
             number_to_nucleotide_table_little_endian(),
             row_size=8
