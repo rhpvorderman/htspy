@@ -37,7 +37,8 @@ setup(
     zip_safe=False,
     packages=find_packages('src'),
     package_dir={'': 'src'},
-    package_data={'htspy': ['*.pyi', "htslib/*.h", "*.h"]},
+    package_data={'htspy': ['py.typed', '*.pyi', "htslib/*.h", "*.h"]},
+    license_file="LICENSE",
     url="https://github.com/rhpvorderman/htspy",
     classifiers=[
         "Programming Language :: Python :: 3 :: Only",
