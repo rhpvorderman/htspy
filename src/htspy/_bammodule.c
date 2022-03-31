@@ -1006,6 +1006,115 @@ PyDoc_STRVAR(BamRecord_to_bytes__doc__,
     {"to_bytes", (PyCFunction)(void(*)(void))BamRecord_to_bytes, METH_NOARGS, \
      BamRecord_to_bytes__doc__}
 
+
+static inline int
+value_type_size(uint8_t value_type) {
+    switch(value_type) {
+        case 'A': 
+        case 'c': 
+        case 'C':
+            return 1;
+        case 's': 
+        case 'S':
+            return 2;
+        case 'f': 
+        case 'i': 
+        case 'I':
+            return 4; 
+        case 'd':
+            return 8;
+        default:
+            PyErr_Format(PyExc_ValueError, "Unkown value type: %c", value_type);
+            return 0;
+    }
+}
+
+static const uint8_t * 
+skip_tag(const uint8_t *start, const uint8_t *end) {
+    if (start >= end) {
+        return end;
+    }
+    if ((end - start) < 4) {
+        if ((end -start) < 2) {
+            PyErr_SetString(PyExc_ValueError, "Truncated tag");
+        } else {
+            PyErr_Format(PyExc_ValueError, "Truncated tag %c%c", 
+                start[0], start[1]);
+        }
+        return NULL; 
+    }
+    uint8_t type = start[2];
+    const uint8_t * value_start = start + 3;
+    const uint8_t * value_end;
+    int value_length;
+    size_t max_length;
+    switch(type) {
+        case 'H':
+        case 'Z':
+            max_length = end - value_start;
+            // strnlen could also have been appropriate but that does not allow
+            // for easy error checking when no terminating NULL is found.
+            uint8_t * string_stop = memchr(value_start, 0, max_length);
+            if (string_stop == NULL) {
+                PyErr_Format(
+                    PyExc_ValueError, 
+                    "Tag %c%c has a string value not terminated by NULL",
+                    start[0], start[1]);
+                return NULL;
+            }
+            return string_stop + 1;
+        case 'B':
+            type = start[3];
+            value_length = value_type_size(type);
+            if (value_length == 0) {
+                return NULL;
+            }
+            value_start = start + 8;
+            if (value_start >= end) {
+                PyErr_Format(PyExc_ValueError, "Truncated tag %c%c", 
+                    start[0], start[1]);
+                    return NULL;
+            }
+            uint32_t array_length =((uint32_t *)start + 4)[0];
+            value_end = value_start + (array_length * value_length);
+            if (value_end > end) {
+                PyErr_Format(PyExc_ValueError, "Truncated tag %c%c", 
+                    start[0], start[1]);
+                    return NULL;          
+            }
+            return value_end;
+        default:
+            value_length = value_type_size(type);
+            if (value_length == 0) {
+                return NULL;
+            }
+            value_end = value_start + value_length;
+            if (value_end > end) {
+                PyErr_Format(PyExc_ValueError, "Truncated tag %c%c", 
+                    start[0], start[1]);
+                    return NULL;          
+            }
+            return value_end;
+    }
+}
+
+// Tag methods
+static const uint8_t *
+find_tag(const uint8_t *tags, size_t tags_length, const uint8_t *tag) {
+    const uint8_t *cursor = tags;
+    const uint8_t *end_ptr = tags + tags_length;
+    while (cursor < end_ptr) {
+        if ((cursor[0] == tag[0]) && (cursor[1] == tag[1])) {
+            return cursor;
+        }
+        cursor = skip_tag(cursor, end_ptr);
+        if (cursor == NULL) {
+            return NULL;
+        }
+    }
+}
+
+
 static void
 BamRecord_to_ptr(BamRecord *self, char * dest) {
     memcpy(dest, (char *)self + BAM_PROPERTIES_STRUCT_START,
