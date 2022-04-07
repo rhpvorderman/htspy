@@ -999,14 +999,6 @@ BamRecord_set_sequence(BamRecord *self, PyObject *const *args, Py_ssize_t nargs)
     Py_RETURN_NONE;
 }
 
-PyDoc_STRVAR(BamRecord_to_bytes__doc__,
-"Return the BAM record as a bytesobject that can be written into a file.");
-
-#define BAMRECORD_TO_BYTES_METHODDEF    \
-    {"to_bytes", (PyCFunction)(void(*)(void))BamRecord_to_bytes, METH_NOARGS, \
-     BamRecord_to_bytes__doc__}
-
-
 static inline int
 value_type_size(uint8_t value_type) {
     switch(value_type) {
@@ -1098,19 +1090,43 @@ skip_tag(const uint8_t *start, const uint8_t *end) {
     }
 }
 
-// Tag methods
-static const uint8_t *
-find_tag(const uint8_t *tags, size_t tags_length, const uint8_t *tag) {
-    const uint8_t *cursor = tags;
-    const uint8_t *end_ptr = tags + tags_length;
-    while (cursor < end_ptr) {
-        if ((cursor[0] == tag[0]) && (cursor[1] == tag[1])) {
-            return cursor;
-        }
-        cursor = skip_tag(cursor, end_ptr);
-        if (cursor == NULL) {
-            return NULL;
-        }
+PyDoc_STRVAR(BamRecord_get_tag__doc__,
+"get_tag($self, tag, /)\n"
+"--\n"
+"\n"
+"Returns a value and its value type in a tuple. Returns (None, None) if not found.\n"
+"\n"
+"  tag\n"
+"    A two-letter ASCII string.\n"
+"\n");
+
+#define BAMRECORD_GET_TAG_METHODDEF    \
+    {"get_tag", (PyCFunction)(void(*)(void))bam_record_get_tag, METH_O, \
+     BamRecord_get_tag__doc__}
+
+static PyObject * 
+BamRecord_get_tag(BamRecord *self, PyObject *tag) {
+    if (!PyUnicode_CheckExact(tag)) {
+        PyErr_Format(PyExc_TypeError, "tag must be of type str, got %s.", 
+                     Py_TYPE(tag)->tp_name);
+        return NULL;
+    }
+    if (!PyUnicode_IS_COMPACT_ASCII(tag)) {
+        PyErr_SetString(PyExc_ValueError, "tag contains non-ASCII characters");
+        return NULL;
+    }
+    if (!(PyUnicode_GET_LENGTH(tag) == 2)) {
+        PyExc_Format(PyExc_ValueError, "tag must have length 2, got %ld", 
+                                        PyUnicode_GET_LENGTH(tag));
+    }
+    uint8_t * search_tag = (uint8_t *)PyUnicode_DATA(tag);
+    uint8_t * tags = (uint8_t *)PyBytes_AS_STRING(self->tags);
+    Py_ssize_t tags_length = PyBytes_GET_SIZE(self->tags);
+    uint8_t * end_ptr = tags + tags_length;
+    uint8_t * tag_ptr = tags;
+    uint8_t * next_tag_ptr; 
+    while (tag_ptr <= end_ptr) {
+        if (tag_ptr[0] )
     }
 }
 
@@ -1143,6 +1159,14 @@ BamRecord_to_ptr(BamRecord *self, char * dest) {
     Py_ssize_t tag_size = PyBytes_GET_SIZE(self->tags);
     memcpy(dest + cursor, PyBytes_AS_STRING(self->tags), tag_size);
 }
+
+
+PyDoc_STRVAR(BamRecord_to_bytes__doc__,
+"Return the BAM record as a bytesobject that can be written into a file.");
+
+#define BAMRECORD_TO_BYTES_METHODDEF    \
+    {"to_bytes", (PyCFunction)(void(*)(void))BamRecord_to_bytes, METH_NOARGS, \
+     BamRecord_to_bytes__doc__}
 
 static PyObject *
 BamRecord_to_bytes(BamRecord *self, PyObject *NoArgs)
