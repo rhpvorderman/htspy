@@ -449,8 +449,10 @@ BamCigarIter__next__(BamCigarIter * self) {
     Py_ssize_t cigar_op = bam_cigar_op(c);
     Py_ssize_t cigar_oplen = bam_cigar_oplen(c);
     self->pos += 1;
-    return PyTuple_Pack(2,
-        PyLong_FromSsize_t(cigar_op), PyLong_FromSsize_t(cigar_oplen));
+    PyObject * tup = PyTuple_New(2);
+    PyTuple_SET_ITEM(tup, 0, PyLong_FromSsize_t(cigar_op));
+    PyTuple_SET_ITEM(tup, 0, PyLong_FromSsize_t(cigar_oplen));
+    return tup;
 }
 
 static PyObject *
@@ -1120,13 +1122,27 @@ BamRecord_get_tag(BamRecord *self, PyObject *tag) {
                                         PyUnicode_GET_LENGTH(tag));
     }
     uint8_t * search_tag = (uint8_t *)PyUnicode_DATA(tag);
+    uint8_t tag_left_char = search_tag[0];
+    uint8_t tag_right_char = search_tag[1];
     uint8_t * tags = (uint8_t *)PyBytes_AS_STRING(self->tags);
     Py_ssize_t tags_length = PyBytes_GET_SIZE(self->tags);
     uint8_t * end_ptr = tags + tags_length;
     uint8_t * tag_ptr = tags;
-    uint8_t * next_tag_ptr; 
+    uint8_t * next_tag_ptr;
+    PyObject * tup;  
     while (tag_ptr <= end_ptr) {
-        if (tag_ptr[0] )
+        if ((tag_ptr[0] == tag_left_char) && (tag_ptr[1]) == tag_right_char) {
+            // TODO: Implement value return
+        }
+        next_tag_ptr = skip_tag(tag_ptr, end_ptr);
+        if (next_tag_ptr == end_ptr) {
+            Py_INCREF(Py_None);
+            Py_INCREF(Py_None);
+            tup = PyTuple_New(2);
+            PyTuple_SET_ITEM(tup, 0, Py_None);
+            PyTuple_SET_ITEM(tup, 1, Py_None);
+            return tup;
+        }
     }
 }
 
