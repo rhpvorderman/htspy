@@ -1131,6 +1131,10 @@ BamRecord_get_tag(BamRecord *self, PyObject *tag) {
     uint8_t * next_tag_ptr;
     PyObject * tup;  
     while (tag_ptr <= end_ptr) {
+        if (tag_ptr + 2 >= (end_ptr)) {
+            PyErr_SetString(PyExc_ValueError, "Truncated tag");
+            return NULL;
+        }
         if ((tag_ptr[0] == tag_left_char) && (tag_ptr[1]) == tag_right_char) {
             // TODO: Implement value return
         }
@@ -1143,6 +1147,7 @@ BamRecord_get_tag(BamRecord *self, PyObject *tag) {
             PyTuple_SET_ITEM(tup, 1, Py_None);
             return tup;
         }
+        tag_ptr = next_tag_ptr;
     }
 }
 
