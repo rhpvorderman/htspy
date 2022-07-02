@@ -1092,6 +1092,31 @@ skip_tag(const uint8_t *start, const uint8_t *end) {
     }
 }
 
+static PyObject * 
+tag_ptr_to_pyobject_and_value(uint8_t * start, uint8_t * end){
+    if (start >= end) {
+        return end;
+    }
+    if ((end - start) < 4) {
+        if ((end -start) < 2) {
+            PyErr_SetString(PyExc_ValueError, "Truncated tag");
+        } else {
+            PyErr_Format(PyExc_ValueError, "Truncated tag %c%c", 
+                start[0], start[1]);
+        }
+        return NULL; 
+    }
+    uint8_t type = start[2];
+    const uint8_t * value_start = start + 3;
+    const uint8_t * value_end;
+    int value_length;
+    size_t max_length;
+    switch(type) {
+        case 'A':
+            
+    }
+}
+
 PyDoc_STRVAR(BamRecord_get_tag__doc__,
 "get_tag($self, tag, /)\n"
 "--\n"
