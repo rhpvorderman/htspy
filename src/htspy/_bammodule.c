@@ -1093,7 +1093,7 @@ skip_tag(const uint8_t *start, const uint8_t *end) {
 }
 
 static PyObject * 
-tag_ptr_to_pyobject_and_value(uint8_t * start, uint8_t * end){
+tag_ptr_to_pyobject(uint8_t *start, uint8_t *end){
     if (start >= end) {
         return end;
     }
@@ -1107,10 +1107,11 @@ tag_ptr_to_pyobject_and_value(uint8_t * start, uint8_t * end){
         return NULL; 
     }
     uint8_t type = start[2];
-    const uint8_t * value_start = start + 3;
-    const uint8_t * value_end;
+    const uint8_t *value_start = start + 3;
+    const uint8_t *value_end;
     int value_length;
     size_t max_length;
+    PyObject *value;
     switch(type) {
         case 'A':
             
