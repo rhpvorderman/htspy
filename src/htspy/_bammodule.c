@@ -1112,7 +1112,9 @@ skip_tag(const uint8_t *start, const uint8_t *end) {
 static PyObject * 
 tag_ptr_to_pyobject(uint8_t *start, uint8_t *end, PyObject *tag_object){
     if (start >= end) {
-        return end;
+        PyErr_SetString(PyExc_RuntimeError, 
+                        "tag_ptr_to_pyobject called with end before start.");
+        return NULL;
     }
     if ((end - start) < 4) {
         if ((end -start) < 2) {
@@ -1124,18 +1126,20 @@ tag_ptr_to_pyobject(uint8_t *start, uint8_t *end, PyObject *tag_object){
         return NULL; 
     }
     uint8_t type = start[2];
-    const uint8_t *value_start = start + 3;
-    size_t max_length = end - value_start;
+    uint8_t *value_start = start + 3;
+    uint8_t *value_end;
+    Py_ssize_t max_length = end - value_start;
     switch(type) {
         case 'A':
             // Only ASCII chars are allowed.
-            return PyUnicode_DecodeASCII(value_start, 1, NULL);
+            return PyUnicode_DecodeASCII((char *)value_start, 1, NULL);
         case 'Z':
-            uint8_t *value_end = memchr(value_start, 0, max_length);
+            value_end = memchr(value_start, 0, max_length);
             if (value_end == NULL) {
                 break;
             }
-            return PyUnicode_DecodeASCII(value_start, value_end - value_start, NULL);
+            return PyUnicode_DecodeASCII((char *)value_start, 
+                                         value_end - value_start, NULL);
         case 'c':
             return PyLong_FromLong(*(int8_t *)value_start);
         case 'C':
