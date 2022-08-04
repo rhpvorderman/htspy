@@ -1108,13 +1108,33 @@ tag_ptr_to_pyobject(uint8_t *start, uint8_t *end){
     }
     uint8_t type = start[2];
     const uint8_t *value_start = start + 3;
-    const uint8_t *value_end;
-    int value_length;
-    size_t max_length;
+    uint8_t *value_end; 
     PyObject *value;
     switch(type) {
         case 'A':
-            
+            // Only ASCII chars are allowed.
+            value = PyUnicode_DecodeASCII(value_start, 1, NULL);
+        case 'Z':
+            value_end = memchr(value_start, 0, end - value_start);
+            if (value_end == NULL) {
+                PyErr_Format(PyExc_ValueError, "Truncated tag %c%c", 
+                        start[0], start[1]);
+                return NULL;                 
+            }
+            return PyUnicode_DecodeASCII(value_start, value_end - value_start, NULL);
+        case 'c':
+            return PyLong_FromLong(*(int8_t *)value_start);
+        case 'C':
+            return PyLong_FromLong(*(uint8_t *)value_start);
+        case 'H':
+            PyErr_SetString(PyExc_NotImplementedError,
+                            "Decoding 'H' type tags is not yet supported.");
+            return NULL;
+        default:
+            PyErr_Format(PyExc_ValueError, 
+                         "Unknown tag type: %c for tag %c%c", 
+                         type, start[0], start[1]);
+            return NULL;
     }
 }
 
