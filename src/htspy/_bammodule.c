@@ -1204,7 +1204,7 @@ PyDoc_STRVAR(BamRecord_get_tag__doc__,
 "get_tag($self, tag, /)\n"
 "--\n"
 "\n"
-"Returns a tuple of (value, value_type). Raises a LookupError if not found.\n"
+"Returns the value of a tag. Raises a LookupError if not found.\n"
 "\n"
 "  tag\n"
 "    A two-letter ASCII string.\n"
@@ -1244,11 +1244,12 @@ BamRecord_get_tag(BamRecord *self, PyObject *tag) {
             return NULL;
         }
         if ((tag_ptr[0] == tag_left_char) && (tag_ptr[1]) == tag_right_char) {
-            // TODO: Implement value return
+            return tag_ptr_to_pyobject(tag_ptr, end_ptr, self->tags);
         }
         next_tag_ptr = skip_tag(tag_ptr, end_ptr);
         if (next_tag_ptr == end_ptr) {
             PyErr_Format(PyExc_LookupError, "Tag not present: %S", tag);
+            return NULL;
         }
         tag_ptr = next_tag_ptr;
     }
