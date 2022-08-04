@@ -1023,6 +1023,23 @@ value_type_size(uint8_t value_type) {
     }
 }
 
+static inline int8_t 
+bam_array_type_to_python_type(uint8_t array_type){
+    switch (array_type) {
+        case 'c': return 'b';
+        case 'C': return 'B';
+        case 's': return 'h';
+        case 'S': return 'H';
+        case 'i': return 'i';
+        case 'I': return 'I';
+        case 'f': return 'f';
+        case 'd': return 'd';
+        default:
+            PyErr_Format(PyExc_ValueError, "Unknown array type: %c", array_type);
+            return 0;
+    }
+}
+
 static const uint8_t * 
 skip_tag(const uint8_t *start, const uint8_t *end) {
     if (start >= end) {
@@ -1093,7 +1110,7 @@ skip_tag(const uint8_t *start, const uint8_t *end) {
 }
 
 static PyObject * 
-tag_ptr_to_pyobject(uint8_t *start, uint8_t *end){
+tag_ptr_to_pyobject(uint8_t *start, uint8_t *end, PyObject *tag_object){
     if (start >= end) {
         return end;
     }
@@ -1108,24 +1125,66 @@ tag_ptr_to_pyobject(uint8_t *start, uint8_t *end){
     }
     uint8_t type = start[2];
     const uint8_t *value_start = start + 3;
-    uint8_t *value_end; 
-    PyObject *value;
+    size_t max_length = end - value_start;
     switch(type) {
         case 'A':
             // Only ASCII chars are allowed.
-            value = PyUnicode_DecodeASCII(value_start, 1, NULL);
+            return PyUnicode_DecodeASCII(value_start, 1, NULL);
         case 'Z':
-            value_end = memchr(value_start, 0, end - value_start);
+            uint8_t *value_end = memchr(value_start, 0, max_length);
             if (value_end == NULL) {
-                PyErr_Format(PyExc_ValueError, "Truncated tag %c%c", 
-                        start[0], start[1]);
-                return NULL;                 
+                break;
             }
             return PyUnicode_DecodeASCII(value_start, value_end - value_start, NULL);
         case 'c':
             return PyLong_FromLong(*(int8_t *)value_start);
         case 'C':
             return PyLong_FromLong(*(uint8_t *)value_start);
+        case 's':
+            if (max_length < 2) break;
+            return PyLong_FromLong(*(int16_t *)value_start);
+        case 'S':
+            if (max_length < 2) break;
+            return PyLong_FromLong(*(uint16_t *)value_start);
+        case 'i':
+            if (max_length < 4) break;
+            return PyLong_FromLong(*(int32_t *)value_start);
+        case 'I':
+            if (max_length < 4) break;
+            return PyLong_FromLong(*(uint32_t *)value_start);
+        case 'f':
+            if (max_length < 4) break;
+            return PyLong_FromLong(*(uint32_t *)value_start);
+        case 'B':
+            // Export a memoryview, as this is the closest thing to a builtin 
+            // array in python. Iterating over it works.
+            if (max_length < 5) 
+                break;
+            uint8_t array_type = value_start[0];
+            uint32_t array_count = *(uint32_t *)(value_start + 1);
+            int itemsize = value_type_size(array_type);
+            if (!itemsize) 
+                return NULL;
+            int8_t python_array_type = bam_array_type_to_python_type(array_type);
+            if (!python_array_type) 
+                return NULL;
+            Py_ssize_t array_size = itemsize * array_count;
+            if (array_size > max_length) break;
+            Py_INCREF(tag_object);
+            Py_buffer array_view = {
+                .buf = value_start + 5,
+                .obj = tag_object,
+                .len = array_size,
+                .itemsize = itemsize,
+                .readonly = 1,
+                .format = python_array_type,
+                .ndim = 1,
+                .strides = NULL,
+                .suboffsets = NULL,
+                .internal = NULL,
+            };
+            array_view.shape = &(array_view.len);
+            return PyMemoryView_FromBuffer(&array_view);
         case 'H':
             PyErr_SetString(PyExc_NotImplementedError,
                             "Decoding 'H' type tags is not yet supported.");
@@ -1136,6 +1195,9 @@ tag_ptr_to_pyobject(uint8_t *start, uint8_t *end){
                          type, start[0], start[1]);
             return NULL;
     }
+    PyErr_Format(PyExc_ValueError, "Truncated tag %c%c", 
+                 start[0], start[1]);
+    return NULL; 
 }
 
 PyDoc_STRVAR(BamRecord_get_tag__doc__,
