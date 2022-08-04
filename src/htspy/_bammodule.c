@@ -1121,7 +1121,7 @@ PyDoc_STRVAR(BamRecord_get_tag__doc__,
 "get_tag($self, tag, /)\n"
 "--\n"
 "\n"
-"Returns a value and its value type in a tuple. Returns (None, None) if not found.\n"
+"Returns a tuple of (value, value_type). Raises a LookupError if not found.\n"
 "\n"
 "  tag\n"
 "    A two-letter ASCII string.\n"
@@ -1146,15 +1146,15 @@ BamRecord_get_tag(BamRecord *self, PyObject *tag) {
         PyExc_Format(PyExc_ValueError, "tag must have length 2, got %ld", 
                                         PyUnicode_GET_LENGTH(tag));
     }
-    uint8_t * search_tag = (uint8_t *)PyUnicode_DATA(tag);
+    uint8_t *search_tag = (uint8_t *)PyUnicode_DATA(tag);
     uint8_t tag_left_char = search_tag[0];
     uint8_t tag_right_char = search_tag[1];
-    uint8_t * tags = (uint8_t *)PyBytes_AS_STRING(self->tags);
+    uint8_t *tags = (uint8_t *)PyBytes_AS_STRING(self->tags);
     Py_ssize_t tags_length = PyBytes_GET_SIZE(self->tags);
-    uint8_t * end_ptr = tags + tags_length;
-    uint8_t * tag_ptr = tags;
-    uint8_t * next_tag_ptr;
-    PyObject * tup;  
+    uint8_t *end_ptr = tags + tags_length;
+    uint8_t *tag_ptr = tags;
+    uint8_t *next_tag_ptr;
+    PyObject *tup;  
     while (tag_ptr <= end_ptr) {
         if (tag_ptr + 2 >= (end_ptr)) {
             PyErr_SetString(PyExc_ValueError, "Truncated tag");
@@ -1165,12 +1165,7 @@ BamRecord_get_tag(BamRecord *self, PyObject *tag) {
         }
         next_tag_ptr = skip_tag(tag_ptr, end_ptr);
         if (next_tag_ptr == end_ptr) {
-            Py_INCREF(Py_None);
-            Py_INCREF(Py_None);
-            tup = PyTuple_New(2);
-            PyTuple_SET_ITEM(tup, 0, Py_None);
-            PyTuple_SET_ITEM(tup, 1, Py_None);
-            return tup;
+            PyErr_Format(PyExc_LookupError, "Tag not present: %S", tag);
         }
         tag_ptr = next_tag_ptr;
     }
