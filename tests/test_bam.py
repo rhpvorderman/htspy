@@ -132,3 +132,11 @@ def test_wrong_iupac_character_second_in_pair(empty_bam):
     with pytest.raises(ValueError) as error:
         empty_bam.set_sequence("AX")
     error.match("Not a IUPAC character: X")
+
+
+@pytest.mark.parametrize(["tag", "raw_tag", "result"],(
+    ("RX", b"XXAZABZnotofinterest\x00RXZmystring\x00", "mystring"),
+))
+def test_get_tag(empty_bam, tag, raw_tag, result):
+    empty_bam.tags = raw_tag
+    assert empty_bam.get_tag(tag) == result
