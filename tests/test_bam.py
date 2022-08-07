@@ -133,8 +133,7 @@ def test_wrong_iupac_character_second_in_pair(empty_bam):
         empty_bam.set_sequence("AX")
     error.match("Not a IUPAC character: X")
 
-
-@pytest.mark.parametrize(["tag", "raw_tag", "result"],(
+TEST_TAGS = (
         ("AB", b"ABAZ", "Z"),
         ("CD", b"CDZmystring\x00", "mystring"),
         ("EF", b"EFc" + struct.pack("<b", -20), -20),
@@ -148,7 +147,12 @@ def test_wrong_iupac_character_second_in_pair(empty_bam):
         # B tag: first type letter, then count (of type uint32_t) then values.
         ("ST", b"STBc" + struct.pack("<Ibbb", 3, -20, 10, -126), [-20, 10, -126]),
         ("UV", b"UVBC" + struct.pack("<IBBB", 3, 65, 129, 203), [65, 129, 203]),
-))
+        ("WX", b"WXBs" + struct.pack("<Ihhh", 3, -4000, 4000, 2000), [-4000, -4000, 2000]),
+        ("YZ", b"YZBS" + struct.pack("<IHHH", 3, 4000, 40000, 65000), [4000, 40000, 65000]),
+)
+
+
+@pytest.mark.parametrize(["tag", "raw_tag", "result"], TEST_TAGS)
 def test_get_tag(empty_bam, tag, raw_tag, result):
     empty_bam.tags = raw_tag
     retrieved_tag = empty_bam.get_tag(tag)
