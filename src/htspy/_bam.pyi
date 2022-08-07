@@ -18,7 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from typing import Iterable, Iterator, Optional, Tuple
+from typing import Iterable, Iterator, Optional, Tuple, Union
 
 class Cigar:
     def __init__(self, cigar_string: str): ...
@@ -74,6 +74,7 @@ class BamRecord:
                            __qualities: Optional[bytes] = None) -> None: ...
     def to_bytes(self) -> bytes: ...
 
+    def get_tag(self, tag: str) -> Union[str, int, float, memoryview]: ...
 
 def bam_iterator(data) -> Iterator[BamRecord]: ...
 

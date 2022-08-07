@@ -1023,20 +1023,20 @@ value_type_size(uint8_t value_type) {
     }
 }
 
-static inline int8_t 
+static inline char *
 bam_array_type_to_python_type(uint8_t array_type){
     switch (array_type) {
-        case 'c': return 'b';
-        case 'C': return 'B';
-        case 's': return 'h';
-        case 'S': return 'H';
-        case 'i': return 'i';
-        case 'I': return 'I';
-        case 'f': return 'f';
-        case 'd': return 'd';
+        case 'c': return "b";
+        case 'C': return "B";
+        case 's': return "h";
+        case 'S': return "H";
+        case 'i': return "i";
+        case 'I': return "I";
+        case 'f': return "F";
+        case 'd': return "D";
         default:
             PyErr_Format(PyExc_ValueError, "Unknown array type: %c", array_type);
-            return 0;
+            return NULL;
     }
 }
 
@@ -1169,7 +1169,7 @@ tag_ptr_to_pyobject(uint8_t *start, uint8_t *end, PyObject *tag_object){
             int itemsize = value_type_size(array_type);
             if (!itemsize) 
                 return NULL;
-            int8_t python_array_type = bam_array_type_to_python_type(array_type);
+            char * python_array_type = bam_array_type_to_python_type(array_type);
             if (!python_array_type) 
                 return NULL;
             Py_ssize_t array_size = itemsize * array_count;
@@ -1215,7 +1215,7 @@ PyDoc_STRVAR(BamRecord_get_tag__doc__,
 "\n");
 
 #define BAMRECORD_GET_TAG_METHODDEF    \
-    {"get_tag", (PyCFunction)(void(*)(void))bam_record_get_tag, METH_O, \
+    {"get_tag", (PyCFunction)(void(*)(void))BamRecord_get_tag, METH_O, \
      BamRecord_get_tag__doc__}
 
 static PyObject * 
@@ -1230,7 +1230,7 @@ BamRecord_get_tag(BamRecord *self, PyObject *tag) {
         return NULL;
     }
     if (!(PyUnicode_GET_LENGTH(tag) == 2)) {
-        PyExc_Format(PyExc_ValueError, "tag must have length 2, got %ld", 
+        PyErr_Format(PyExc_ValueError, "tag must have length 2, got %ld", 
                                         PyUnicode_GET_LENGTH(tag));
     }
     uint8_t *search_tag = (uint8_t *)PyUnicode_DATA(tag);
@@ -1241,7 +1241,6 @@ BamRecord_get_tag(BamRecord *self, PyObject *tag) {
     uint8_t *end_ptr = tags + tags_length;
     uint8_t *tag_ptr = tags;
     uint8_t *next_tag_ptr;
-    PyObject *tup;  
     while (tag_ptr <= end_ptr) {
         if (tag_ptr + 2 >= (end_ptr)) {
             PyErr_SetString(PyExc_ValueError, "Truncated tag");
@@ -1251,12 +1250,10 @@ BamRecord_get_tag(BamRecord *self, PyObject *tag) {
             return tag_ptr_to_pyobject(tag_ptr, end_ptr, self->tags);
         }
         next_tag_ptr = skip_tag(tag_ptr, end_ptr);
-        if (next_tag_ptr == end_ptr) {
-            PyErr_Format(PyExc_LookupError, "Tag not present: %S", tag);
-            return NULL;
-        }
         tag_ptr = next_tag_ptr;
     }
+    PyErr_Format(PyExc_LookupError, "Tag not present: %S", tag);
+    return NULL;
 }
 
 
@@ -1315,6 +1312,7 @@ static PyMethodDef BamRecord_methods[] = {
     BAMRECORD_TO_BYTES_METHODDEF,
     BAMRECORD_GET_SEQUENCE_METHODDEF,
     BAMRECORD_SET_SEQUENCE_METHODDEF,
+    BAMRECORD_GET_TAG_METHODDEF,
     {NULL}
 };
 
