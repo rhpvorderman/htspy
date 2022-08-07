@@ -135,8 +135,20 @@ def test_wrong_iupac_character_second_in_pair(empty_bam):
 
 
 @pytest.mark.parametrize(["tag", "raw_tag", "result"],(
-    ("RX", b"XXAZABZnotofinterest\x00RXZmystring\x00", "mystring"),
+        ("AB", b"ABAZ", "Z"),
+        ("CD", b"CDZmystring\x00", "mystring"),
+        ("EF", b"EFc" + struct.pack("<b", -20), -20),
+        ("GH", b"GHC" + struct.pack("<B", 170), 170),
+        ("IJ", b"IJs" + struct.pack("<h", -1024), -1024),
+        ("KL", b"KLS" + struct.pack("<H", 65000), 65000),
+        ("MN", b"MNi" + struct.pack("<i", -80_000), -80_000),
+        ("OP", b"OPI" + struct.pack("<I", 3_000_000_000), 3_000_000_000),
+        ("QR", b"QRf" + struct.pack("<f", 2.4),
+            struct.unpack("<f", struct.pack("<f", 2.4))[0]),
 ))
 def test_get_tag(empty_bam, tag, raw_tag, result):
     empty_bam.tags = raw_tag
-    assert empty_bam.get_tag(tag) == result
+    retrieved_tag = empty_bam.get_tag(tag)
+    if isinstance(retrieved_tag, memoryview):
+        retrieved_tag = retrieved_tag.tolist()
+    assert retrieved_tag == result

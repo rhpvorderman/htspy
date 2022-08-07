@@ -1158,7 +1158,7 @@ tag_ptr_to_pyobject(uint8_t *start, uint8_t *end, PyObject *tag_object){
             return PyLong_FromLong(*(uint32_t *)value_start);
         case 'f':
             if (max_length < 4) break;
-            return PyLong_FromLong(*(uint32_t *)value_start);
+            return PyFloat_FromDouble(*(float *)value_start);
         case 'B':
             // Export a memoryview, as this is the closest thing to a builtin 
             // array in python. Iterating over it works.
