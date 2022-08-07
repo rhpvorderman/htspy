@@ -145,6 +145,9 @@ def test_wrong_iupac_character_second_in_pair(empty_bam):
         ("OP", b"OPI" + struct.pack("<I", 3_000_000_000), 3_000_000_000),
         ("QR", b"QRf" + struct.pack("<f", 2.4),
             struct.unpack("<f", struct.pack("<f", 2.4))[0]),
+        # B tag: first type letter, then count (of type uint32_t) then values.
+        ("ST", b"STBc" + struct.pack("<Ibbb", 3, -20, 10, -126), [-20, 10, -126]),
+        ("UV", b"UVBC" + struct.pack("<IBBB", 3, 65, 129, 203), [65, 129, 203]),
 ))
 def test_get_tag(empty_bam, tag, raw_tag, result):
     empty_bam.tags = raw_tag
