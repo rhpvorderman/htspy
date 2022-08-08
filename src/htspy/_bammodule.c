@@ -1183,11 +1183,12 @@ tag_ptr_to_pyobject(uint8_t *start, uint8_t *end, PyObject *tag_object){
                 .readonly = 1,
                 .format = python_array_type,
                 .ndim = 1,
+                // Fields below are automatically set by PyMemoryView_FromBuffer
+                .shape = NULL,
                 .strides = NULL,
                 .suboffsets = NULL,
                 .internal = NULL,
             };
-            array_view.shape = &(array_view.len);
             return PyMemoryView_FromBuffer(&array_view);
         case 'H':
             PyErr_SetString(PyExc_NotImplementedError,
