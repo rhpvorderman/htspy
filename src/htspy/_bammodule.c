@@ -1189,7 +1189,11 @@ tag_ptr_to_pyobject(uint8_t *start, uint8_t *end, PyObject *tag_object){
                 .suboffsets = NULL,
                 .internal = NULL,
             };
-            return PyMemoryView_FromBuffer(&array_view);
+            PyObject *memview = PyMemoryView_FromBuffer(&array_view);
+            // PyMemoryView_FromBuffer sets this to NULL, but the underlying 
+            // object should be properly decreased in reference count.
+            ((PyMemoryViewObject *)memview)->mbuf->master.obj = tag_object;
+            return memview;
         case 'H':
             PyErr_SetString(PyExc_NotImplementedError,
                             "Decoding 'H' type tags is not yet supported.");
