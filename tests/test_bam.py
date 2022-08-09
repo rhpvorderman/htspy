@@ -134,6 +134,13 @@ def test_wrong_iupac_character_second_in_pair(empty_bam):
         empty_bam.set_sequence("AX")
     error.match("Not a IUPAC character: X")
 
+
+def float32(f: float):
+    """Represent float f with 32-bit precision."""
+    reduced, = struct.unpack("<f", struct.pack("<f", f))
+    return reduced
+
+
 TEST_TAGS = (
         ("AB", b"ABAZ", "Z"),
         ("CD", b"CDZmystring\x00", "mystring"),
@@ -150,6 +157,10 @@ TEST_TAGS = (
         ("UV", b"UVBC" + struct.pack("<IBBB", 3, 65, 129, 203), [65, 129, 203]),
         ("WX", b"WXBs" + struct.pack("<Ihhh", 3, -4000, 4000, 2000), [-4000, 4000, 2000]),
         ("YZ", b"YZBS" + struct.pack("<IHHH", 3, 4000, 40000, 65000), [4000, 40000, 65000]),
+        ("AA", b"AABi" + struct.pack("<Iiii", 3, -80000, 80000, 2_000_000_000), [-80000, 80000, 2_000_000_000]),
+        ("BB", b"BBBI" + struct.pack("<IIII", 3, 80000, 2_000_000_000, 4_000_000_000), [80000, 2_000_000_000, 4_000_000_000]),
+        ("CC", b"CCBf" + struct.pack("<Ifff", 3, 1.1, 2.2, 3.3), [float32(1.1), float32(2.2), float32(3.3)]),
+        ("DD", b"DDBd" + struct.pack("<Iddd", 3, 1.1, 2.2, 3.3), [1.1, 2.2, 3.3]),
 )
 
 

@@ -1032,8 +1032,8 @@ bam_array_type_to_python_type(uint8_t array_type){
         case 'S': return "H";
         case 'i': return "i";
         case 'I': return "I";
-        case 'f': return "F";
-        case 'd': return "D";
+        case 'f': return "f";
+        case 'd': return "d";
         default:
             PyErr_Format(PyExc_ValueError, "Unknown array type: %c", array_type);
             return NULL;
