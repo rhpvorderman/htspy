@@ -1055,8 +1055,8 @@ skip_tag(const uint8_t *start, const uint8_t *end) {
         return NULL; 
     }
     uint8_t type = start[2];
-    const uint8_t * value_start = start + 3;
-    const uint8_t * value_end;
+    const uint8_t *value_start = start + 3;
+    const uint8_t *value_end;
     int value_length;
     size_t max_length;
     switch(type) {
@@ -1065,7 +1065,7 @@ skip_tag(const uint8_t *start, const uint8_t *end) {
             max_length = end - value_start;
             // strnlen could also have been appropriate but that does not allow
             // for easy error checking when no terminating NULL is found.
-            uint8_t * string_stop = memchr(value_start, 0, max_length);
+            uint8_t *string_stop = memchr(value_start, 0, max_length);
             if (string_stop == NULL) {
                 PyErr_Format(
                     PyExc_ValueError, 
@@ -1086,7 +1086,7 @@ skip_tag(const uint8_t *start, const uint8_t *end) {
                     start[0], start[1]);
                     return NULL;
             }
-            uint32_t array_length =((uint32_t *)start + 4)[0];
+            uint32_t array_length = *((uint32_t *)(start + 4));
             value_end = value_start + (array_length * value_length);
             if (value_end > end) {
                 PyErr_Format(PyExc_ValueError, "Truncated tag %c%c", 

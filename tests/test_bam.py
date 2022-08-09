@@ -174,3 +174,17 @@ def test_get_tag(empty_bam, tag, raw_tag, result):
     assert retrieved_tag == result
     del(result)
     assert sys.getrefcount(raw_tag) == ref_before
+
+
+def concatenate_tags():
+    for i, (tag, raw_tag, result) in enumerate(TEST_TAGS):
+        yield tag, TEST_TAGS[i - 1][1] + raw_tag, result
+
+
+@pytest.mark.parametrize(["tag", "raw_tag", "result"], concatenate_tags())
+def test_get_tag_correct_skip(empty_bam, tag, raw_tag, result):
+    empty_bam.tags = raw_tag
+    retrieved_tag = empty_bam.get_tag(tag)
+    if isinstance(retrieved_tag, memoryview):
+        retrieved_tag = retrieved_tag.tolist()
+    assert retrieved_tag == result
