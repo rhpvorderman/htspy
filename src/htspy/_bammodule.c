@@ -1045,11 +1045,11 @@ skip_tag(const uint8_t *start, const uint8_t *end) {
     if (start >= end) {
         return end;
     }
-    if ((end - start) < 4) {
-        if ((end -start) < 2) {
-            PyErr_SetString(PyExc_ValueError, "Truncated tag");
+    if ((end - start) <= 4) {  // end_ptr is NULL byte
+        if ((end - start) <= 2) {
+            PyErr_SetString(PyExc_ValueError, "truncated tag");
         } else {
-            PyErr_Format(PyExc_ValueError, "Truncated tag %c%c", 
+            PyErr_Format(PyExc_ValueError, "truncated tag %c%c", 
                 start[0], start[1]);
         }
         return NULL; 
@@ -1082,14 +1082,14 @@ skip_tag(const uint8_t *start, const uint8_t *end) {
             }
             value_start = start + 8;
             if (value_start >= end) {
-                PyErr_Format(PyExc_ValueError, "Truncated tag %c%c", 
+                PyErr_Format(PyExc_ValueError, "truncated tag %c%c", 
                     start[0], start[1]);
                     return NULL;
             }
             uint32_t array_length = *((uint32_t *)(start + 4));
             value_end = value_start + (array_length * value_length);
             if (value_end > end) {
-                PyErr_Format(PyExc_ValueError, "Truncated tag %c%c", 
+                PyErr_Format(PyExc_ValueError, "truncated tag %c%c", 
                     start[0], start[1]);
                     return NULL;          
             }
@@ -1101,7 +1101,7 @@ skip_tag(const uint8_t *start, const uint8_t *end) {
             }
             value_end = value_start + value_length;
             if (value_end > end) {
-                PyErr_Format(PyExc_ValueError, "Truncated tag %c%c", 
+                PyErr_Format(PyExc_ValueError, "truncated tag %c%c", 
                     start[0], start[1]);
                     return NULL;          
             }
@@ -1118,9 +1118,9 @@ tag_ptr_to_pyobject(uint8_t *start, uint8_t *end, PyObject *tag_object){
     }
     if ((end - start) < 4) {
         if ((end -start) < 2) {
-            PyErr_SetString(PyExc_ValueError, "Truncated tag");
+            PyErr_SetString(PyExc_ValueError, "truncated tag");
         } else {
-            PyErr_Format(PyExc_ValueError, "Truncated tag %c%c", 
+            PyErr_Format(PyExc_ValueError, "truncated tag %c%c", 
                 start[0], start[1]);
         }
         return NULL; 
@@ -1204,7 +1204,7 @@ tag_ptr_to_pyobject(uint8_t *start, uint8_t *end, PyObject *tag_object){
                          type, start[0], start[1]);
             return NULL;
     }
-    PyErr_Format(PyExc_ValueError, "Truncated tag %c%c", 
+    PyErr_Format(PyExc_ValueError, "truncated tag %c%c", 
                  start[0], start[1]);
     return NULL; 
 }
@@ -1237,6 +1237,7 @@ BamRecord_get_tag(BamRecord *self, PyObject *tag) {
     if (!(PyUnicode_GET_LENGTH(tag) == 2)) {
         PyErr_Format(PyExc_ValueError, "tag must have length 2, got %ld", 
                                         PyUnicode_GET_LENGTH(tag));
+        return NULL;
     }
     uint8_t *search_tag = (uint8_t *)PyUnicode_DATA(tag);
     uint8_t tag_left_char = search_tag[0];
@@ -1246,9 +1247,9 @@ BamRecord_get_tag(BamRecord *self, PyObject *tag) {
     uint8_t *end_ptr = tags + tags_length;
     uint8_t *tag_ptr = tags;
     uint8_t *next_tag_ptr;
-    while (tag_ptr <= end_ptr) {
+    while (tag_ptr < end_ptr) {
         if (tag_ptr + 2 >= (end_ptr)) {
-            PyErr_SetString(PyExc_ValueError, "Truncated tag");
+            PyErr_SetString(PyExc_ValueError, "truncated tag");
             return NULL;
         }
         if ((tag_ptr[0] == tag_left_char) && (tag_ptr[1]) == tag_right_char) {

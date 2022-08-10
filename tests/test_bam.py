@@ -188,3 +188,21 @@ def test_get_tag_correct_skip(empty_bam, tag, raw_tag, result):
     if isinstance(retrieved_tag, memoryview):
         retrieved_tag = retrieved_tag.tolist()
     assert retrieved_tag == result
+
+
+def truncated_tags():
+    for tag, raw_tag, result in TEST_TAGS:
+        # Checks tag_ptr to pyobject code
+        for i in range(1, len(tag) + 1):
+            yield tag, raw_tag[:-i]
+        # checks skip tag code
+        for i in range(1, len(tag) + 1):
+            yield "XX", raw_tag[:-i]
+
+
+@pytest.mark.parametrize(["tag", "trunc_tag"], truncated_tags())
+def test_trucated_tag_error(empty_bam, tag, trunc_tag):
+    empty_bam.tags = trunc_tag
+    with pytest.raises(ValueError) as error:
+        empty_bam.get_tag(tag)
+    error.match("truncated tag")
