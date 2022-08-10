@@ -193,10 +193,10 @@ def test_get_tag_correct_skip(empty_bam, tag, raw_tag, result):
 def truncated_tags():
     for tag, raw_tag, result in TEST_TAGS:
         # Checks tag_ptr to pyobject code
-        for i in range(1, len(tag) + 1):
+        for i in range(1, len(raw_tag)):
             yield tag, raw_tag[:-i]
         # checks skip tag code
-        for i in range(1, len(tag) + 1):
+        for i in range(1, len(raw_tag)):
             yield "XX", raw_tag[:-i]
 
 

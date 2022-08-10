@@ -1256,6 +1256,9 @@ BamRecord_get_tag(BamRecord *self, PyObject *tag) {
             return tag_ptr_to_pyobject(tag_ptr, end_ptr, self->tags);
         }
         next_tag_ptr = skip_tag(tag_ptr, end_ptr);
+        if (next_tag_ptr == NULL) {
+            return NULL;
+        }
         tag_ptr = next_tag_ptr;
     }
     PyErr_Format(PyExc_LookupError, "Tag not present: %S", tag);
