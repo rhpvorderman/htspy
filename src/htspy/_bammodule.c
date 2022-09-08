@@ -1265,6 +1265,23 @@ BamRecord_get_tag(BamRecord *self, PyObject *tag) {
     return NULL;
 }
 
+static const char PyObject_to_format(PyObject *value) {
+    if (PyUnicode_CheckExact(value)) {
+        return 'Z';
+    }
+    if (PyLong_CheckExact(value)) {
+        return 'I';
+    }
+    if (PyFloat_CheckExact(value)) {
+        return 'f';
+    }
+    if (PyObject_CheckBuffer(value)) {
+        return 'B';
+    }
+    PyErr_Format(PyExc_ValueError, "Could not determine appropriate tag type for %R", value);
+    return -1;
+}
+
 PyDoc_STRVAR(BamRecord_set_tag__doc__,
 "set_tag($self, tag, value, /, value_type=None)\n"
 "--\n"
