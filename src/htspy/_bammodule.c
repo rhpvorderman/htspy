@@ -1270,6 +1270,16 @@ static const char *tag_to_format(char *tag) {
         case 'A': switch (tag[1]) {
             case 'M': return "i";
             case 'S': return "i";
+            default: break;
+        }
+        case 'B': switch (tag[1]) {
+            case 'C': return "Z";
+            case 'Q': return "Z";
+            case 'Z': return "Z";
+            default: break;
+        }
+        case 'C': switch (tag[1]) {
+
         }
     }
 }
@@ -1302,7 +1312,8 @@ PyDoc_STRVAR(BamRecord_set_tag__doc__,
 "  value\n"
 "    The value to store in the tag.\n"
 "  value_type\n"
-"    The value type of the tag. By default this automatically determined by the vaule.\n"
+"    The value type of the tag. \n"
+"    By default this automatically determined by the tag if tag is in the SAM tag specification or else the value.\n"
 "\n");
 
 #define BAMRECORD_SET_TAG_METHODDEF    \
