@@ -1265,21 +1265,30 @@ BamRecord_get_tag(BamRecord *self, PyObject *tag) {
     return NULL;
 }
 
-static const char PyObject_to_format(PyObject *value) {
+static const char *tag_to_format(char *tag) {
+    switch (tag[0]) {
+        case 'A': switch (tag[1]) {
+            case 'M': return "i";
+            case 'S': return "i";
+        }
+    }
+}
+
+static const char *PyObject_to_format(PyObject *value) {
     if (PyUnicode_CheckExact(value)) {
-        return 'Z';
+        return "Z";
     }
     if (PyLong_CheckExact(value)) {
-        return 'I';
+        return "I";
     }
     if (PyFloat_CheckExact(value)) {
-        return 'f';
+        return "f";
     }
     if (PyObject_CheckBuffer(value)) {
-        return 'B';
+        return "B";
     }
     PyErr_Format(PyExc_ValueError, "Could not determine appropriate tag type for %R", value);
-    return -1;
+    return NULL;
 }
 
 PyDoc_STRVAR(BamRecord_set_tag__doc__,
