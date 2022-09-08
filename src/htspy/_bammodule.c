@@ -1265,6 +1265,33 @@ BamRecord_get_tag(BamRecord *self, PyObject *tag) {
     return NULL;
 }
 
+PyDoc_STRVAR(BamRecord_set_tag__doc__,
+"set_tag($self, tag, value, /, value_type=None)\n"
+"--\n"
+"\n"
+"Set the value of a tag.\n"
+"\n"
+"  tag\n"
+"    A two-letter ASCII string.\n"
+"  value\n"
+"    The value to store in the tag.\n"
+"  value_type\n"
+"    The value type of the tag. By default this automatically determined by the vaule.\n"
+"\n");
+
+#define BAMRECORD_SET_TAG_METHODDEF    \
+    {"set_tag", (PyCFunction)(void(*)(void))BamRecord_set_tag, METH_VARARGS | METH_KEYWORDS, \
+     BamRecord_set_tag__doc__}
+
+static PyObject *BamRecord_set_tag(BamRecord *self, PyObject *args, PyObject *kwargs)
+{
+    PyObject *tag = NULL; 
+    PyObject *value = NULL;
+    PyObject *value_type = Py_None;
+    static char *format = "O!O!";
+    static char *keywords[] = {"", "", "value_type", NULL};
+    PyArg_ParseTupleAndKeywords(args, kwargs, format, keywords);
+}
 
 static void
 BamRecord_to_ptr(BamRecord *self, char * dest) {
