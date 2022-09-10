@@ -1265,7 +1265,7 @@ BamRecord_get_tag(BamRecord *self, PyObject *tag) {
     return NULL;
 }
 
-static const char *tag_to_format(const uint8_t *tag) {
+static const char *tag_to_value_type(const uint8_t *tag) {
     // Need to use a macro here for use in case statements.
     #define TAG_KEY(left, right) ((uint16_t)left << 8 | (uint16_t)(right))
     
@@ -1340,7 +1340,7 @@ static const char *tag_to_format(const uint8_t *tag) {
     }
 }
 
-static const char *PyObject_to_format(PyObject *value) {
+static const char *PyObject_to_value_type(PyObject *value) {
     if (PyUnicode_CheckExact(value)) {
         return "Z";
     }
@@ -1353,7 +1353,8 @@ static const char *PyObject_to_format(PyObject *value) {
     if (PyObject_CheckBuffer(value)) {
         return "B";
     }
-    PyErr_Format(PyExc_ValueError, "Could not determine appropriate tag type for %R", value);
+    PyErr_Format(PyExc_ValueError, 
+                 "Could not determine appropriate tag type for %R", value);
     return NULL;
 }
 
@@ -1369,22 +1370,72 @@ PyDoc_STRVAR(BamRecord_set_tag__doc__,
 "    The value to store in the tag.\n"
 "  value_type\n"
 "    The value type of the tag. \n"
-"    By default this automatically determined by the tag if tag is in the SAM tag specification or else the value.\n"
+"    By default this automatically determined by the tag if tag is in the \n" 
+"    SAMtags specification or else the value.\n"
 "\n");
 
 #define BAMRECORD_SET_TAG_METHODDEF    \
-    {"set_tag", (PyCFunction)(void(*)(void))BamRecord_set_tag, METH_VARARGS | METH_KEYWORDS, \
-     BamRecord_set_tag__doc__}
+    {"set_tag", (PyCFunction)(void(*)(void))BamRecord_set_tag, \
+     METH_VARARGS | METH_KEYWORDS, BamRecord_set_tag__doc__}
 
 static PyObject *BamRecord_set_tag(BamRecord *self, PyObject *args, PyObject *kwargs)
 {
-    PyObject *tag = NULL; 
+    PyObject *tag_obj = NULL;
+    uint8_t *tag = NULL; 
     PyObject *value = NULL;
-    PyObject *value_type = Py_None;
-    static char *format = "O!O!";
+    PyObject *value_type_obj = NULL;
+    const char *value_type = NULL;
+    static char *format = "O!OO!:BamRecord.set_tag()";
     static char *keywords[] = {"", "", "value_type", NULL};
-    PyArg_ParseTupleAndKeywords(args, kwargs, format, keywords);
+    if (!PyArg_ParseTupleAndKeywords(
+            args, kwargs, format, keywords, 
+            &PyUnicode_Type, tag_obj, 
+            value, 
+            &PyUnicode_Type, value_type_obj)) { 
+                return NULL;
+    }
+    if (!PyUnicode_IS_COMPACT_ASCII(tag_obj)) {
+        PyErr_SetString(PyExc_ValueError, 
+                        "tag should only consist of ASCII characters");
+        return NULL;
+    }
+    if (PyUnicode_GET_LENGTH(tag_obj) != 2) {
+        PyErr_Format(
+            PyExc_ValueError, 
+            "tag must have a length of exactly 2, got %d",
+            PyUnicode_GET_LENGTH(tag_obj)
+        );
+        return NULL;
+    }
+    tag = PyUnicode_DATA(tag_obj);
+    if (value_type_obj) {
+        if (!PyUnicode_IS_COMPACT_ASCII(value_type_obj)) {
+            PyErr_SetString(
+                PyExc_ValueError, 
+                "value_type should only consist of ASCII characters");
+            return NULL;
+        }
+        Py_ssize_t value_type_length = PyUnicode_GET_LENGTH(value_type_obj);
+        if (value_type_length != 1 || value_type_length != 2) {
+            PyErr_Format(
+                PyExc_ValueError, 
+                "value_type must have a length of 1 or 2, got %d",
+                value_type_length);
+            return NULL;
+        }
+        value_type = PyUnicode_DATA(value_type_obj);
+    }
+    else {
+        value_type = tag_to_value_type(tag);
+        if (value_type == NULL) {
+            value_type = PyObject_to_value_type(value);
+        }
+        if (value_type == NULL) {
+            return NULL;
+        }
+    }
 }
+
 
 static void
 BamRecord_to_ptr(BamRecord *self, char * dest) {
@@ -1442,6 +1493,7 @@ static PyMethodDef BamRecord_methods[] = {
     BAMRECORD_GET_SEQUENCE_METHODDEF,
     BAMRECORD_SET_SEQUENCE_METHODDEF,
     BAMRECORD_GET_TAG_METHODDEF,
+    BAMRECORD_SET_TAG_METHODDEF,
     {NULL}
 };
 
