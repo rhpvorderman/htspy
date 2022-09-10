@@ -1265,75 +1265,75 @@ BamRecord_get_tag(BamRecord *self, PyObject *tag) {
     return NULL;
 }
 
-static const uint8_t *tag_to_format(const uint8_t *tag) {
+static const char *tag_to_format(const uint8_t *tag) {
     // Need to use a macro here for use in case statements.
-    #define TAG_KEY(t) ((uint8_t)(t[0]) << 8 | (uint8_t)(t[1]))
-
+    #define TAG_KEY(left, right) ((uint16_t)left << 8 | (uint16_t)(right))
+    
     // Only uppercase tags are in the SAMtags spec, so alternatively a 26 by 36
     // lookup table can be used, but the switch statement is easier to use and maintain.
     // Let the compiler optimize for now.
-    uint16_t key = TAG_KEY(tag);
+    uint16_t key = TAG_KEY(tag[0], tag[1]);
     switch (key) {
-        case TAG_KEY("TS"):
+        case TAG_KEY('T', 'S'):
             return "A";
-        case TAG_KEY("AM"):
-        case TAG_KEY("AS"):
-        case TAG_KEY("CM"):
-        case TAG_KEY("CP"):
-        case TAG_KEY("FI"):
-        case TAG_KEY("H0"):
-        case TAG_KEY("H1"):
-        case TAG_KEY("H2"):
-        case TAG_KEY("HI"):
-        case TAG_KEY("IH"):
-        case TAG_KEY("MQ"):
-        case TAG_KEY("NH"):
-        case TAG_KEY("NM"):
-        case TAG_KEY("OP"):
-        case TAG_KEY("PQ"):
-        case TAG_KEY("SM"):
-        case TAG_KEY("TC"):
-        case TAG_KEY("UQ"):
+        case TAG_KEY('A', 'M'):
+        case TAG_KEY('A', 'S'):
+        case TAG_KEY('C', 'M'):
+        case TAG_KEY('C', 'P'):
+        case TAG_KEY('F', 'I'):
+        case TAG_KEY('H', '0'):
+        case TAG_KEY('H', '1'):
+        case TAG_KEY('H', '2'):
+        case TAG_KEY('H', 'I'):
+        case TAG_KEY('I', 'H'):
+        case TAG_KEY('M', 'Q'):
+        case TAG_KEY('N', 'H'):
+        case TAG_KEY('N', 'M'):
+        case TAG_KEY('O', 'P'):
+        case TAG_KEY('P', 'Q'):
+        case TAG_KEY('S', 'M'):
+        case TAG_KEY('T', 'C'):
+        case TAG_KEY('U', 'Q'):
             return "i";
-        case TAG_KEY("BC"):
-        case TAG_KEY("BQ"):
-        case TAG_KEY("BZ"):
-        case TAG_KEY("CB"):
-        case TAG_KEY("CC"):
-        case TAG_KEY("CO"):
-        case TAG_KEY("CQ"):
-        case TAG_KEY("CR"):
-        case TAG_KEY("CS"):
-        case TAG_KEY("CT"):
-        case TAG_KEY("CY"):
-        case TAG_KEY("E2"):
-        case TAG_KEY("FS"):
-        case TAG_KEY("LB"):
-        case TAG_KEY("MC"):
-        case TAG_KEY("MD"):
-        case TAG_KEY("MI"):
-        case TAG_KEY("MM"):
-        case TAG_KEY("OA"):
-        case TAG_KEY("OC"):
-        case TAG_KEY("OQ"):
-        case TAG_KEY("OX"):
-        case TAG_KEY("PG"):
-        case TAG_KEY("PT"):
-        case TAG_KEY("PU"):
-        case TAG_KEY("Q2"):
-        case TAG_KEY("QT"):
-        case TAG_KEY("QX"):
-        case TAG_KEY("R2"):
-        case TAG_KEY("RG"):
-        case TAG_KEY("RX"):
-        case TAG_KEY("SA"):
-        case TAG_KEY("U2"):
+        case TAG_KEY('B', 'C'):
+        case TAG_KEY('B', 'Q'):
+        case TAG_KEY('B', 'Z'):
+        case TAG_KEY('C', 'B'):
+        case TAG_KEY('C', 'C'):
+        case TAG_KEY('C', 'O'):
+        case TAG_KEY('C', 'Q'):
+        case TAG_KEY('C', 'R'):
+        case TAG_KEY('C', 'S'):
+        case TAG_KEY('C', 'T'):
+        case TAG_KEY('C', 'Y'):
+        case TAG_KEY('E', '2'):
+        case TAG_KEY('F', 'S'):
+        case TAG_KEY('L', 'B'):
+        case TAG_KEY('M', 'C'):
+        case TAG_KEY('M', 'D'):
+        case TAG_KEY('M', 'I'):
+        case TAG_KEY('M', 'M'):
+        case TAG_KEY('O', 'A'):
+        case TAG_KEY('O', 'C'):
+        case TAG_KEY('O', 'Q'):
+        case TAG_KEY('O', 'X'):
+        case TAG_KEY('P', 'G'):
+        case TAG_KEY('P', 'T'):
+        case TAG_KEY('P', 'U'):
+        case TAG_KEY('Q', '2'):
+        case TAG_KEY('Q', 'T'):
+        case TAG_KEY('Q', 'X'):
+        case TAG_KEY('R', '2'):
+        case TAG_KEY('R', 'G'):
+        case TAG_KEY('R', 'X'):
+        case TAG_KEY('S', 'A'):
+        case TAG_KEY('U', '2'):
             return "Z";
-        case TAG_KEY("ML"):
+        case TAG_KEY('M', 'L'):
             return "BC";
-        case TAG_KEY("FZ"):
+        case TAG_KEY('F', 'Z'):
             return "BS";
-        case TAG_KEY("CG"):
+        case TAG_KEY('C', 'G'):
             return "BI";
         default:
             return NULL;
