@@ -1265,22 +1265,78 @@ BamRecord_get_tag(BamRecord *self, PyObject *tag) {
     return NULL;
 }
 
-static const char *tag_to_format(char *tag) {
-    switch (tag[0]) {
-        case 'A': switch (tag[1]) {
-            case 'M': return "i";
-            case 'S': return "i";
-            default: break;
-        }
-        case 'B': switch (tag[1]) {
-            case 'C': return "Z";
-            case 'Q': return "Z";
-            case 'Z': return "Z";
-            default: break;
-        }
-        case 'C': switch (tag[1]) {
+static const uint8_t *tag_to_format(const uint8_t *tag) {
+    // Need to use a macro here for use in case statements.
+    #define TAG_KEY(t) ((uint8_t)(t[0]) << 8 | (uint8_t)(t[1]))
 
-        }
+    // Only uppercase tags are in the SAMtags spec, so alternatively a 26 by 36
+    // lookup table can be used, but the switch statement is easier to use and maintain.
+    // Let the compiler optimize for now.
+    uint16_t key = TAG_KEY(tag);
+    switch (key) {
+        case TAG_KEY("TS"):
+            return "A";
+        case TAG_KEY("AM"):
+        case TAG_KEY("AS"):
+        case TAG_KEY("CM"):
+        case TAG_KEY("CP"):
+        case TAG_KEY("FI"):
+        case TAG_KEY("H0"):
+        case TAG_KEY("H1"):
+        case TAG_KEY("H2"):
+        case TAG_KEY("HI"):
+        case TAG_KEY("IH"):
+        case TAG_KEY("MQ"):
+        case TAG_KEY("NH"):
+        case TAG_KEY("NM"):
+        case TAG_KEY("OP"):
+        case TAG_KEY("PQ"):
+        case TAG_KEY("SM"):
+        case TAG_KEY("TC"):
+        case TAG_KEY("UQ"):
+            return "i";
+        case TAG_KEY("BC"):
+        case TAG_KEY("BQ"):
+        case TAG_KEY("BZ"):
+        case TAG_KEY("CB"):
+        case TAG_KEY("CC"):
+        case TAG_KEY("CO"):
+        case TAG_KEY("CQ"):
+        case TAG_KEY("CR"):
+        case TAG_KEY("CS"):
+        case TAG_KEY("CT"):
+        case TAG_KEY("CY"):
+        case TAG_KEY("E2"):
+        case TAG_KEY("FS"):
+        case TAG_KEY("LB"):
+        case TAG_KEY("MC"):
+        case TAG_KEY("MD"):
+        case TAG_KEY("MI"):
+        case TAG_KEY("MM"):
+        case TAG_KEY("OA"):
+        case TAG_KEY("OC"):
+        case TAG_KEY("OQ"):
+        case TAG_KEY("OX"):
+        case TAG_KEY("PG"):
+        case TAG_KEY("PT"):
+        case TAG_KEY("PU"):
+        case TAG_KEY("Q2"):
+        case TAG_KEY("QT"):
+        case TAG_KEY("QX"):
+        case TAG_KEY("R2"):
+        case TAG_KEY("RG"):
+        case TAG_KEY("RX"):
+        case TAG_KEY("SA"):
+        case TAG_KEY("U2"):
+            return "Z";
+        case TAG_KEY("ML"):
+            return "BC";
+        case TAG_KEY("FZ"):
+            return "BS";
+        case TAG_KEY("CG"):
+            return "BI";
+        default:
+            return NULL;
     }
 }
 
