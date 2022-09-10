@@ -1385,7 +1385,7 @@ static PyObject *BamRecord_set_tag(BamRecord *self, PyObject *args, PyObject *kw
     PyObject *value = NULL;
     PyObject *value_type_obj = NULL;
     const char *value_type = NULL;
-    static char *format = "O!OO!:BamRecord.set_tag()";
+    static char *format = "O!O|O!:BamRecord.set_tag()";
     static char *keywords[] = {"", "", "value_type", NULL};
     if (!PyArg_ParseTupleAndKeywords(
             args, kwargs, format, keywords, 
