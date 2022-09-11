@@ -1194,6 +1194,8 @@ tag_ptr_to_pyobject(uint8_t *start, uint8_t *end, PyObject *tag_object){
                 break;
             uint8_t array_type = value_start[0];
             uint32_t array_count = *(uint32_t *)(value_start + 1);
+            uint8_t *array_start = value_start + 5;
+            size_t array_max_length = end - array_start;
             int itemsize = value_type_size(array_type);
             if (!itemsize) 
                 return NULL;
@@ -1201,7 +1203,7 @@ tag_ptr_to_pyobject(uint8_t *start, uint8_t *end, PyObject *tag_object){
             if (!python_array_type) 
                 return NULL;
             Py_ssize_t array_size = itemsize * array_count;
-            if (array_size > max_length) break;
+            if (array_size > array_max_length) break;
             Py_INCREF(tag_object);
             Py_buffer array_view = {
                 .buf = value_start + 5,
