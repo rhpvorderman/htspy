@@ -1109,6 +1109,34 @@ skip_tag(const uint8_t *start, const uint8_t *end) {
     }
 }
 
+static int
+find_tag(const uint8_t *tags, size_t tags_length, const uint8_t *tag, 
+         uint8_t **found_tag)
+{
+    uint8_t tag_left_char = tag[0];
+    uint8_t tag_right_char = tag[1];
+    const uint8_t *end_ptr = tags + tags_length;
+    const uint8_t *tag_ptr = tags;
+    const uint8_t *next_tag_ptr;
+    while (tag_ptr < end_ptr) {
+        if (tag_ptr + 2 >= (end_ptr)) {
+            PyErr_SetString(PyExc_ValueError, "truncated tag");
+            return -1;
+        }
+        if ((tag_ptr[0] == tag_left_char) && (tag_ptr[1]) == tag_right_char) {
+            *found_tag = tag_ptr;
+            return 0;
+        }
+        next_tag_ptr = skip_tag(tag_ptr, end_ptr);
+        if (next_tag_ptr == NULL) {
+            return -1;
+        }
+        tag_ptr = next_tag_ptr;
+    }
+    *found_tag = NULL;
+    return 0;
+}
+
 static PyObject * 
 tag_ptr_to_pyobject(uint8_t *start, uint8_t *end, PyObject *tag_object){
     if (start >= end) {
@@ -1240,29 +1268,18 @@ BamRecord_get_tag(BamRecord *self, PyObject *tag) {
         return NULL;
     }
     uint8_t *search_tag = (uint8_t *)PyUnicode_DATA(tag);
-    uint8_t tag_left_char = search_tag[0];
-    uint8_t tag_right_char = search_tag[1];
     uint8_t *tags = (uint8_t *)PyBytes_AS_STRING(self->tags);
     Py_ssize_t tags_length = PyBytes_GET_SIZE(self->tags);
-    uint8_t *end_ptr = tags + tags_length;
-    uint8_t *tag_ptr = tags;
-    uint8_t *next_tag_ptr;
-    while (tag_ptr < end_ptr) {
-        if (tag_ptr + 2 >= (end_ptr)) {
-            PyErr_SetString(PyExc_ValueError, "truncated tag");
-            return NULL;
-        }
-        if ((tag_ptr[0] == tag_left_char) && (tag_ptr[1]) == tag_right_char) {
-            return tag_ptr_to_pyobject(tag_ptr, end_ptr, self->tags);
-        }
-        next_tag_ptr = skip_tag(tag_ptr, end_ptr);
-        if (next_tag_ptr == NULL) {
-            return NULL;
-        }
-        tag_ptr = next_tag_ptr;
+    uint8_t *found_tag = NULL;
+    int ret = find_tag(tags, tags_length, search_tag, &found_tag);
+    if (ret != 0) {
+        return NULL;
     }
-    PyErr_Format(PyExc_LookupError, "Tag not present: %S", tag);
-    return NULL;
+    if (found_tag == NULL) {
+        PyErr_Format(PyExc_LookupError, "Tag not present: %S", tag);
+        return NULL;
+    }
+    return tag_ptr_to_pyobject(found_tag, tags + tags_length, self->tags);
 }
 
 static const char *tag_to_value_type(const uint8_t *tag) {
@@ -1356,6 +1373,21 @@ static const char *PyObject_to_value_type(PyObject *value) {
     PyErr_Format(PyExc_ValueError, 
                  "Could not determine appropriate tag type for %R", value);
     return NULL;
+}
+
+static int _BamRecord_set_string_tag(BamRecord *self, 
+                                     const uint8_t *tag, 
+                                     const uint8_t *value_type, 
+                                     const PyObject *value) 
+{
+    //pass 
+}
+static int _BamRecord_set_tag(BamRecord *self, 
+                              const uint8_t *tag, 
+                              const uint8_t *value_type, 
+                              const PyObject *value) 
+{
+    // pass
 }
 
 PyDoc_STRVAR(BamRecord_set_tag__doc__,
