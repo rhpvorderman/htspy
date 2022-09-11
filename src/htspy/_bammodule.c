@@ -1069,7 +1069,7 @@ skip_tag(const uint8_t *start, const uint8_t *end) {
             if (string_stop == NULL) {
                 PyErr_Format(
                     PyExc_ValueError, 
-                    "Tag %c%c has a string value not terminated by NULL",
+                    "truncated tag: %c%c has a string value not terminated by NULL",
                     start[0], start[1]);
                 return NULL;
             }
