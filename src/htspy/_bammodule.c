@@ -451,7 +451,7 @@ BamCigarIter__next__(BamCigarIter * self) {
     self->pos += 1;
     PyObject * tup = PyTuple_New(2);
     PyTuple_SET_ITEM(tup, 0, PyLong_FromSsize_t(cigar_op));
-    PyTuple_SET_ITEM(tup, 0, PyLong_FromSsize_t(cigar_oplen));
+    PyTuple_SET_ITEM(tup, 1, PyLong_FromSsize_t(cigar_oplen));
     return tup;
 }
 
