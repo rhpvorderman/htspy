@@ -1202,7 +1202,7 @@ tag_ptr_to_pyobject(uint8_t *start, uint8_t *end, PyObject *tag_object){
             char * python_array_type = bam_array_type_to_python_type(array_type);
             if (!python_array_type) 
                 return NULL;
-            Py_ssize_t array_size = itemsize * array_count;
+            size_t array_size = itemsize * array_count;
             if (array_size > array_max_length) break;
             Py_INCREF(tag_object);
             Py_buffer array_view = {
@@ -1489,7 +1489,7 @@ static PyObject *BamRecord_set_tag(BamRecord *self, PyObject *args, PyObject *kw
     uint8_t *tag = NULL; 
     PyObject *value = NULL;
     PyObject *value_type_obj = NULL;
-    const char *value_type = NULL;
+    const uint8_t *value_type = NULL;
     static char *format = "O!O|O!:BamRecord.set_tag()";
     static char *keywords[] = {"", "", "value_type", NULL};
     if (!PyArg_ParseTupleAndKeywords(
@@ -1531,14 +1531,18 @@ static PyObject *BamRecord_set_tag(BamRecord *self, PyObject *args, PyObject *kw
         value_type = PyUnicode_DATA(value_type_obj);
     }
     else {
-        value_type = tag_to_value_type(tag);
+        value_type = (uint8_t *)tag_to_value_type(tag);
         if (value_type == NULL) {
-            value_type = PyObject_to_value_type(value);
+            value_type = (uint8_t *)PyObject_to_value_type(value);
         }
         if (value_type == NULL) {
             return NULL;
         }
     }
+    if (_BamRecord_set_tag(self, tag, value_type, value) != 0) {
+        return NULL;
+    }
+    return Py_None;
 }
 
 
