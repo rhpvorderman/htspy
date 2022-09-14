@@ -210,5 +210,8 @@ def test_trucated_tag_error(empty_bam, tag, trunc_tag):
 
 @pytest.mark.parametrize(["tag", "raw_tag", "value"], TEST_TAGS)
 def test_set_tag(empty_bam, tag, raw_tag, value):
-    empty_bam.set_tag(tag, value)
+    value_type = raw_tag[2:3].decode("ASCII")
+    if value_type == "B":
+        value_type = raw_tag[2:4].decode("ASCII")
+    empty_bam.set_tag(tag, value, value_type)
     assert empty_bam._tags == raw_tag

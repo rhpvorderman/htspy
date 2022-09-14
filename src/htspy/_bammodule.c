@@ -1521,7 +1521,7 @@ static PyObject *BamRecord_set_tag(BamRecord *self, PyObject *args, PyObject *kw
             return NULL;
         }
         Py_ssize_t value_type_length = PyUnicode_GET_LENGTH(value_type_obj);
-        if (value_type_length != 1 || value_type_length != 2) {
+        if (value_type_length != 1 && value_type_length != 2) {
             PyErr_Format(
                 PyExc_ValueError, 
                 "value_type must have a length of 1 or 2, got %d",
