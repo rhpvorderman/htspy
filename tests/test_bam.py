@@ -206,3 +206,9 @@ def test_trucated_tag_error(empty_bam, tag, trunc_tag):
     with pytest.raises(ValueError) as error:
         empty_bam.get_tag(tag)
     error.match("truncated tag")
+
+
+@pytest.mark.parametrize(["tag", "raw_tag", "value"], TEST_TAGS)
+def test_set_tag(empty_bam, tag, raw_tag, value):
+    empty_bam.set_tag(tag, value)
+    assert empty_bam._tags == raw_tag
