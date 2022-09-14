@@ -1377,19 +1377,90 @@ static const char *PyObject_to_value_type(PyObject *value) {
     return NULL;
 }
 
-static int _BamRecord_set_string_tag(BamRecord *self, 
-                                     const uint8_t *tag, 
-                                     const uint8_t *value_type, 
-                                     const PyObject *value) 
-{
-    //pass 
-}
 static int _BamRecord_set_tag(BamRecord *self, 
                               const uint8_t *tag, 
                               const uint8_t *value_type, 
                               const PyObject *value) 
 {
-    // pass
+    uint8_t *tags = (uint8_t *)PyBytes_AS_STRING(self->tags);
+    Py_ssize_t tags_length = PyBytes_GET_SIZE(self->tags);
+    uint8_t *tags_end = tags + tags_length;
+    uint8_t *old_tag_start = NULL;
+    if (find_tag(tags, tags_length, tag, &old_tag_start) != 0) {
+        return -1;
+    }
+    size_t before_tag_length = tags_length;
+    const uint8_t *after_tag_start = NULL;
+    size_t after_tag_length = 0;
+    if (old_tag_start != NULL) {
+        before_tag_length = old_tag_start - tags; 
+        after_tag_start = skip_tag(old_tag_start, tags_end);
+        if (after_tag_start == NULL) {
+            return -1;
+        }
+        after_tag_length = tags_end - after_tag_start;
+    }
+    // Use a tag_marker so we can dynamically adapt it for B type tags.
+    uint8_t tag_marker[8];
+    tag_marker[0] = tag[0];
+    tag_marker[1] = tag[1];
+    tag_marker[2] = value_type[0];
+    size_t tag_marker_length = 3;
+    void *tag_value;
+    size_t tag_value_size;
+    
+    switch(value_type[0]) {
+        default:
+            PyErr_Format(PyExc_ValueError, "Unkown format: %c", value_type[0]);
+            return -1;
+        case 'Z':
+            if (!PyUnicode_CheckExact(value)) {
+                PyErr_Format(
+                    PyExc_TypeError, 
+                    "Tag '%c%c' with value_type 'Z' only accepts type str "
+                    "inputs, got %s", 
+                    tag[0], tag[1], Py_TYPE(value)->tp_name);
+                return -1;
+            }
+            if (!PyUnicode_IS_COMPACT_ASCII(value)) {
+                PyErr_Format(
+                    PyExc_ValueError, 
+                    "Tag '%c%c' with value_type 'Z' only accepts valid ASCII "
+                    "strings.",
+                    tag[0], tag[1]);
+                return -1;
+            }
+            tag_value = PyUnicode_DATA(value);
+            // + 1 to the length, as CPython ensures a NULL byte at the end of 
+            // the string.
+            tag_value_size = PyUnicode_GET_LENGTH(value) + 1;
+    }
+    Py_ssize_t new_size = before_tag_length + after_tag_length + 
+                          tag_marker_length + tag_value_size;
+    size_t old_block_size = self->block_size;
+    size_t new_block_size = old_block_size + new_size - tags_length;
+    if (new_block_size > UINT32_MAX) {
+        PyErr_SetString(PyExc_OverflowError, "Value too big to store in BamRecord");
+        return -1;
+    }
+    PyObject *tmp = PyBytes_FromStringAndSize(NULL, new_size);
+    if (tmp == NULL) {
+        PyErr_NoMemory();
+        return -1;
+    }
+    void *new_tags = PyBytes_AsString(tmp);
+    memcpy(new_tags, tags, before_tag_length);
+    new_tags += before_tag_length;
+    memcpy(new_tags, after_tag_start, after_tag_length);
+    new_tags += after_tag_length;
+    memcpy(new_tags, tag_marker, tag_marker_length);
+    new_tags += tag_marker_length;
+    memcpy(new_tags, tag_value, tag_value_size);
+    PyObject *old_tag_object = self->tags;
+    self->tags = tmp;
+    self->block_size = new_block_size;
+    Py_DECREF(old_tag_object);
+    return 0;
 }
 
 PyDoc_STRVAR(BamRecord_set_tag__doc__,
