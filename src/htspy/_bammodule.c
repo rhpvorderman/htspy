@@ -1111,7 +1111,7 @@ skip_tag(const uint8_t *start, const uint8_t *end) {
 
 static int
 find_tag(const uint8_t *tags, size_t tags_length, const uint8_t *tag, 
-         uint8_t **found_tag)
+         const uint8_t **found_tag)
 {
     uint8_t tag_left_char = tag[0];
     uint8_t tag_right_char = tag[1];
@@ -1138,7 +1138,7 @@ find_tag(const uint8_t *tags, size_t tags_length, const uint8_t *tag,
 }
 
 static PyObject * 
-tag_ptr_to_pyobject(uint8_t *start, uint8_t *end, PyObject *tag_object){
+tag_ptr_to_pyobject(const uint8_t *start, const uint8_t *end, PyObject *tag_object){
     if (start >= end) {
         PyErr_SetString(PyExc_RuntimeError, 
                         "tag_ptr_to_pyobject called with end before start.");
@@ -1154,7 +1154,7 @@ tag_ptr_to_pyobject(uint8_t *start, uint8_t *end, PyObject *tag_object){
         return NULL; 
     }
     uint8_t type = start[2];
-    uint8_t *value_start = start + 3;
+    const uint8_t *value_start = start + 3;
     uint8_t *value_end;
     Py_ssize_t max_length = end - value_start;
     switch(type) {
@@ -1194,7 +1194,7 @@ tag_ptr_to_pyobject(uint8_t *start, uint8_t *end, PyObject *tag_object){
                 break;
             uint8_t array_type = value_start[0];
             uint32_t array_count = *(uint32_t *)(value_start + 1);
-            uint8_t *array_start = value_start + 5;
+            const uint8_t *array_start = value_start + 5;
             size_t array_max_length = end - array_start;
             int itemsize = value_type_size(array_type);
             if (!itemsize) 
@@ -1206,7 +1206,7 @@ tag_ptr_to_pyobject(uint8_t *start, uint8_t *end, PyObject *tag_object){
             if (array_size > array_max_length) break;
             Py_INCREF(tag_object);
             Py_buffer array_view = {
-                .buf = value_start + 5,
+                .buf = (void *)(value_start + 5),
                 .obj = tag_object,
                 .len = array_size,
                 .itemsize = itemsize,
@@ -1272,7 +1272,7 @@ BamRecord_get_tag(BamRecord *self, PyObject *tag) {
     uint8_t *search_tag = (uint8_t *)PyUnicode_DATA(tag);
     uint8_t *tags = (uint8_t *)PyBytes_AS_STRING(self->tags);
     Py_ssize_t tags_length = PyBytes_GET_SIZE(self->tags);
-    uint8_t *found_tag = NULL;
+    const uint8_t *found_tag = NULL;
     int ret = find_tag(tags, tags_length, search_tag, &found_tag);
     if (ret != 0) {
         return NULL;
@@ -1382,10 +1382,10 @@ static int _BamRecord_set_tag(BamRecord *self,
                               const uint8_t *value_type, 
                               const PyObject *value) 
 {
-    uint8_t *tags = (uint8_t *)PyBytes_AS_STRING(self->tags);
+    const uint8_t *tags = (uint8_t *)PyBytes_AS_STRING(self->tags);
     Py_ssize_t tags_length = PyBytes_GET_SIZE(self->tags);
-    uint8_t *tags_end = tags + tags_length;
-    uint8_t *old_tag_start = NULL;
+    const uint8_t *tags_end = tags + tags_length;
+    const uint8_t *old_tag_start = NULL;
     if (find_tag(tags, tags_length, tag, &old_tag_start) != 0) {
         return -1;
     }
