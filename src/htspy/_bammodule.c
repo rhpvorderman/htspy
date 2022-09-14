@@ -1413,27 +1413,42 @@ static int _BamRecord_set_tag(BamRecord *self,
         default:
             PyErr_Format(PyExc_ValueError, "Unkown format: %c", value_type[0]);
             return -1;
+        case 'A': 
         case 'Z':
             if (!PyUnicode_CheckExact(value)) {
                 PyErr_Format(
                     PyExc_TypeError, 
-                    "Tag '%c%c' with value_type 'Z' only accepts type str "
+                    "Tag '%c%c' with value_type '%c' only accepts type str "
                     "inputs, got %s", 
-                    tag[0], tag[1], Py_TYPE(value)->tp_name);
+                    tag[0], tag[1], value_type[0], Py_TYPE(value)->tp_name);
                 return -1;
             }
             if (!PyUnicode_IS_COMPACT_ASCII(value)) {
                 PyErr_Format(
                     PyExc_ValueError, 
-                    "Tag '%c%c' with value_type 'Z' only accepts valid ASCII "
-                    "strings.",
-                    tag[0], tag[1]);
+                    "Tag '%c%c' with value_type '%c' only accepts valid ASCII "
+                    "characters.",
+                    tag[0], tag[1], value_type[0]);
                 return -1;
             }
             tag_value = PyUnicode_DATA(value);
+            if (value_type[0] == 'A') {
+                if (PyUnicode_GET_LENGTH(value) != 1) {
+                    PyErr_Format(
+                        PyExc_ValueError, 
+                        "Tag '%c%c' with value_type 'A', needs a string with "
+                        "exactly one character, got %d",
+                        tag[0], tag[1], PyUnicode_GET_LENGTH(value));
+                    return -1;
+                }
+                tag_value_size = 1;
+            } else {
+                // + 1 to the length, as CPython ensures a NULL byte at the end of 
             // + 1 to the length, as CPython ensures a NULL byte at the end of 
-            // the string.
-            tag_value_size = PyUnicode_GET_LENGTH(value) + 1;
+                // + 1 to the length, as CPython ensures a NULL byte at the end of 
+                // the string.
+                tag_value_size = PyUnicode_GET_LENGTH(value) + 1;
+            }          
     }
     Py_ssize_t new_size = before_tag_length + after_tag_length + 
                           tag_marker_length + tag_value_size;
