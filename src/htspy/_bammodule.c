@@ -1448,7 +1448,72 @@ static int _BamRecord_set_tag(BamRecord *self,
                 // + 1 to the length, as CPython ensures a NULL byte at the end of 
                 // the string.
                 tag_value_size = PyUnicode_GET_LENGTH(value) + 1;
-            }          
+            }
+            break;
+        case 'c':
+            long long v = PyLong_AsLongLong(value);
+            if ((v == -1) && PyErr_Occurred()) {
+                return -1;
+            }
+            if ((v < INT8_MIN) || (v > INT8_MAX)) {
+                PyErr_Format(
+                    PyExc_ValueError, 
+                    "Tag '%c%c' with value_type '%c' should have a value "
+                    "between %ld and %ld.",
+                    tag[0], tag[1], value_type[0], INT8_MIN, INT8_MAX);
+            }
+            int8_t val = (int8_t)v; 
+            tag_value = &val;
+            tag_value_size = 1;
+            break;
+        case 's':
+            long long v = PyLong_AsLongLong(value);
+            if ((v == -1) && PyErr_Occurred()) {
+                return -1;
+            }
+            if ((v < INT16_MIN) || (v > INT16_MAX)) {
+                PyErr_Format(
+                    PyExc_ValueError, 
+                    "Tag '%c%c' with value_type '%c' should have a value "
+                    "between %ld and %ld.",
+                    tag[0], tag[1], value_type[0], INT16_MIN, INT16_MAX);
+            }
+            int16_t val = (int16_t)v; 
+            tag_value = &val;
+            tag_value_size = 2;
+            break;
+        case 'i':
+            long long v = PyLong_AsLongLong(value);
+            if ((v == -1) && PyErr_Occurred()) {
+                return -1;
+            }
+            if ((v < INT32_MIN) || (v > INT32_MAX)) {
+                PyErr_Format(
+                    PyExc_ValueError, 
+                    "Tag '%c%c' with value_type '%c' should have a value "
+                    "between %ld and %ld.",
+                    tag[0], tag[1], value_type[0], INT32_MIN, INT32_MAX);
+            }
+            int32_t val = (int32_t)v; 
+            tag_value = &val;
+            tag_value_size = 4;
+            break;
+        case 'C':
+            unsigned long long v = PyLong_AsUnsignedLongLong(value);
+            if ((v == -1) && PyErr_Occurred()) {
+                return -1;
+            }
+            if ((v < 0) || (v > UINT8_MAX)) {
+                PyErr_Format(
+                    PyExc_ValueError, 
+                    "Tag '%c%c' with value_type '%c' should have a value "
+                    "between %ld and %ld.",
+                    tag[0], tag[1], value_type[0], 0, UINT8_MAX);
+            }
+            uint8_t val = (uint8_t)v; 
+            tag_value = &val;
+            tag_value_size = 1;
+            break;
     }
     Py_ssize_t new_size = before_tag_length + after_tag_length + 
                           tag_marker_length + tag_value_size;
