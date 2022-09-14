@@ -1494,9 +1494,9 @@ static PyObject *BamRecord_set_tag(BamRecord *self, PyObject *args, PyObject *kw
     static char *keywords[] = {"", "", "value_type", NULL};
     if (!PyArg_ParseTupleAndKeywords(
             args, kwargs, format, keywords, 
-            &PyUnicode_Type, tag_obj, 
-            value, 
-            &PyUnicode_Type, value_type_obj)) { 
+            &PyUnicode_Type, &tag_obj, 
+            &value, 
+            &PyUnicode_Type, &value_type_obj)) { 
                 return NULL;
     }
     if (!PyUnicode_IS_COMPACT_ASCII(tag_obj)) {
