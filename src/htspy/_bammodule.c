@@ -150,7 +150,7 @@ BamCigar_get_buffer(BamCigar *self, Py_buffer *view, int flags) {
     }
     Py_INCREF(self);
     view->obj = (PyObject *)self;
-    view->buf = (void *)self->cigar;
+    view->buf = (void *)self->cigar;  // Discard const, readonly is set.
     view->len = sizeof(uint32_t) * Py_SIZE(self);
     view->readonly = 1;
     view->itemsize = sizeof(uint32_t);
@@ -1206,7 +1206,7 @@ tag_ptr_to_pyobject(const uint8_t *start, const uint8_t *end, PyObject *tag_obje
             if (array_size > array_max_length) break;
             Py_INCREF(tag_object);
             Py_buffer array_view = {
-                .buf = (void *)(value_start + 5),
+                .buf = (void *)(value_start + 5),  // Discard const, readonly is set.
                 .obj = tag_object,
                 .len = array_size,
                 .itemsize = itemsize,
