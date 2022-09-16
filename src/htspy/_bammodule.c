@@ -1456,17 +1456,49 @@ static int _BamRecord_set_array_tag(BamRecord *self,
     return -1;
 }
 
+// Tag value store functions here. A lot of repetitive code. Is there a better
+// way to refactor this?
+static int StoreTagValue_c(PyObject *value, void *value_store, uint8_t *tag) 
+{
+    long long v = PyLong_AsLongLong(value);
+    if ((v == -1) && PyErr_Occurred()) {
+        return 0;
+    }
+    if ((v < INT8_MIN) || (v > INT8_MAX)) {
+        PyErr_Format(
+            PyExc_ValueError, 
+            "Tag '%c%c' with value_type 'c' should have a value "
+            "between %ld and %ld.",
+            tag[0], tag[1], INT8_MIN, INT8_MAX);
+    }
+    ((int8_t *)value_store)[0] = (int8_t)v; 
+    return 1;
+}
+
+static int StoreTagValue_s(PyObject *value, void *value_store, uint8_t *tag) 
+{
+    long long v = PyLong_AsLongLong(value);
+    if ((v == -1) && PyErr_Occurred()) {
+        return 0;
+    }
+    if ((v < INT16_MIN) || (v > INT16_MAX)) {
+        PyErr_Format(
+            PyExc_ValueError, 
+            "Tag '%c%c' with value_type 's' should have a value "
+            "between %ld and %ld.",
+            tag[0], tag[1], INT16_MIN, INT16_MAX);
+    }
+    ((int16_t *)value_store)[0] = (int16_t)v; 
+    return 2;
+}
+
+// end of tag value store functions.
+
 static int _BamRecord_set_tag(BamRecord *self, 
                               const uint8_t *tag, 
                               const uint8_t *value_type, 
                               PyObject *value) 
 {
-    if (value_type[0] == 'B') {
-        // Array tags are quite different and thus require quite a different
-        // approach than single value tags and strings.
-        return _BamRecord_set_array_tag(self, tag, value_type[1], value);
-    }
-
     void *tag_value;
     size_t tag_value_size;
     
@@ -1474,6 +1506,10 @@ static int _BamRecord_set_tag(BamRecord *self,
         default:
             PyErr_Format(PyExc_ValueError, "Unkown format: %c", value_type[0]);
             return -1;
+        case 'B':
+            // Array tags are quite different and thus require quite a different
+            // approach than single value tags and strings.
+            return _BamRecord_set_array_tag(self, tag, value_type[1], value);
         case 'A': 
         case 'Z':
             if (!PyUnicode_CheckExact(value)) {
@@ -1561,7 +1597,7 @@ static int _BamRecord_set_tag(BamRecord *self,
             break;
         case 'C':
             unsigned long long v = PyLong_AsUnsignedLongLong(value);
-            if ((v == -1) && PyErr_Occurred()) {
+            if ((v == -1UL) && PyErr_Occurred()) {
                 return -1;
             }
             if ((v < 0) || (v > UINT8_MAX)) {
@@ -1577,7 +1613,7 @@ static int _BamRecord_set_tag(BamRecord *self,
             break;
         case 'S':
             unsigned long long v = PyLong_AsUnsignedLongLong(value);
-            if ((v == -1) && PyErr_Occurred()) {
+            if ((v == -1UL) && PyErr_Occurred()) {
                 return -1;
             }
             if ((v < 0) || (v > UINT16_MAX)) {
@@ -1593,7 +1629,7 @@ static int _BamRecord_set_tag(BamRecord *self,
             break;
         case 'I':
             unsigned long long v = PyLong_AsUnsignedLongLong(value);
-            if ((v == -1) && PyErr_Occurred()) {
+            if ((v == -1UL) && PyErr_Occurred()) {
                 return -1;
             }
             if ((v < 0) || (v > UINT32_MAX)) {
