@@ -1377,6 +1377,22 @@ static const char *PyObject_to_value_type(PyObject *value) {
     return NULL;
 }
 
+/**
+ * @brief Add, replace or delete a tag on a BamRecord
+ * 
+ * This function checks if the tag already exists, if so it replaces it.
+ * If the tag does not exist, it adds the new tag. To delete a tag, use
+ * tag_marker_length=0 and tag_value_length=0. 
+ *  
+ * @param self BamRecord object
+ * @param tag A pointer to a two-character tag (uint8_t[2]) or equivalent string.
+ * @param tag_marker The marker for the replacing tag. Pointer to array with 
+ *                   tag, value_type and optional array type + count.
+ * @param tag_marker_length 3 for singular values 8 for array types. 
+ * @param tag_value A pointer to the value of the new tag
+ * @param tag_value_length The length of the value.
+ * @return int 0 on success -1 on failure.
+ */
 static int _BamRecord_replace_tag(BamRecord *self, 
                                   const uint8_t *tag,
                                   const uint8_t *tag_marker,
