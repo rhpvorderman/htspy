@@ -1377,10 +1377,12 @@ static const char *PyObject_to_value_type(PyObject *value) {
     return NULL;
 }
 
-static int _BamRecord_set_tag(BamRecord *self, 
-                              const uint8_t *tag, 
-                              const uint8_t *value_type, 
-                              PyObject *value) 
+static int _BamRecord_replace_tag(BamRecord *self, 
+                                  const uint8_t *tag,
+                                  const uint8_t *tag_marker,
+                                  size_t tag_marker_length,
+                                  uint8_t *tag_value,
+                                  size_t tag_value_length)
 {
     const uint8_t *tags = (uint8_t *)PyBytes_AS_STRING(self->tags);
     Py_ssize_t tags_length = PyBytes_GET_SIZE(self->tags);
@@ -1400,12 +1402,55 @@ static int _BamRecord_set_tag(BamRecord *self,
         }
         after_tag_length = tags_end - after_tag_start;
     }
-    // Use a tag_marker so we can dynamically adapt it for B type tags.
-    uint8_t tag_marker[8];
-    tag_marker[0] = tag[0];
-    tag_marker[1] = tag[1];
-    tag_marker[2] = value_type[0];
-    size_t tag_marker_length = 3;
+    Py_ssize_t new_size = before_tag_length + 
+                          after_tag_length + 
+                          tag_marker_length + 
+                          tag_value_length;
+    size_t old_block_size = self->block_size;
+    size_t new_block_size = old_block_size + new_size - tags_length;
+    if (new_block_size > UINT32_MAX) {
+        PyErr_SetString(PyExc_OverflowError, "Value too big to store in BamRecord");
+        return -1;
+    }
+    PyObject *tmp = PyBytes_FromStringAndSize(NULL, new_size);
+    if (tmp == NULL) {
+        PyErr_NoMemory();
+        return -1;
+    }
+    void *new_tags = PyBytes_AsString(tmp);
+    memcpy(new_tags, tags, before_tag_length);
+    new_tags += before_tag_length;
+    memcpy(new_tags, after_tag_start, after_tag_length);
+    new_tags += after_tag_length;
+    memcpy(new_tags, tag_marker, tag_marker_length);
+    new_tags += tag_marker_length;
+    memcpy(new_tags, tag_value, tag_value_length);
+    PyObject *old_tag_object = self->tags;
+    self->tags = tmp;
+    self->block_size = new_block_size;
+    Py_DECREF(old_tag_object);
+}
+
+static int _BamRecord_set_array_tag(BamRecord *self,
+                                    const uint8_t *tag,
+                                    uint8_t array_type, 
+                                    PyObject *value)
+{
+    PyErr_SetString(PyExc_NotImplementedError, "Array tags are not yet implemented");
+    return -1;
+}
+
+static int _BamRecord_set_tag(BamRecord *self, 
+                              const uint8_t *tag, 
+                              const uint8_t *value_type, 
+                              PyObject *value) 
+{
+    if (value_type[0] == 'B') {
+        // Array tags are quite different and thus require quite a different
+        // approach than single value tags and strings.
+        return _BamRecord_set_array_tag(self, tag, value_type[1], value);
+    }
+
     void *tag_value;
     size_t tag_value_size;
     
@@ -1555,32 +1600,8 @@ static int _BamRecord_set_tag(BamRecord *self,
             tag_value = &flt;
             tag_value_size = 4;
     }
-    Py_ssize_t new_size = before_tag_length + after_tag_length + 
-                          tag_marker_length + tag_value_size;
-    size_t old_block_size = self->block_size;
-    size_t new_block_size = old_block_size + new_size - tags_length;
-    if (new_block_size > UINT32_MAX) {
-        PyErr_SetString(PyExc_OverflowError, "Value too big to store in BamRecord");
-        return -1;
-    }
-    PyObject *tmp = PyBytes_FromStringAndSize(NULL, new_size);
-    if (tmp == NULL) {
-        PyErr_NoMemory();
-        return -1;
-    }
-    void *new_tags = PyBytes_AsString(tmp);
-    memcpy(new_tags, tags, before_tag_length);
-    new_tags += before_tag_length;
-    memcpy(new_tags, after_tag_start, after_tag_length);
-    new_tags += after_tag_length;
-    memcpy(new_tags, tag_marker, tag_marker_length);
-    new_tags += tag_marker_length;
-    memcpy(new_tags, tag_value, tag_value_size);
-    PyObject *old_tag_object = self->tags;
-    self->tags = tmp;
-    self->block_size = new_block_size;
-    Py_DECREF(old_tag_object);
-    return 0;
+    uint8_t tag_marker[3] = {tag[0], tag[1], value_type[0]};
+    return _BamRecord_replace_tag(self, tag, tag_marker, 3, tag_value, tag_value_size);
 }
 
 PyDoc_STRVAR(BamRecord_set_tag__doc__,
