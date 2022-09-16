@@ -1380,7 +1380,7 @@ static const char *PyObject_to_value_type(PyObject *value) {
 static int _BamRecord_set_tag(BamRecord *self, 
                               const uint8_t *tag, 
                               const uint8_t *value_type, 
-                              const PyObject *value) 
+                              PyObject *value) 
 {
     const uint8_t *tags = (uint8_t *)PyBytes_AS_STRING(self->tags);
     Py_ssize_t tags_length = PyBytes_GET_SIZE(self->tags);
@@ -1514,6 +1514,46 @@ static int _BamRecord_set_tag(BamRecord *self,
             tag_value = &val;
             tag_value_size = 1;
             break;
+        case 'S':
+            unsigned long long v = PyLong_AsUnsignedLongLong(value);
+            if ((v == -1) && PyErr_Occurred()) {
+                return -1;
+            }
+            if ((v < 0) || (v > UINT16_MAX)) {
+                PyErr_Format(
+                    PyExc_ValueError, 
+                    "Tag '%c%c' with value_type '%c' should have a value "
+                    "between %ld and %ld.",
+                    tag[0], tag[1], value_type[0], 0, UINT16_MAX);
+            }
+            uint16_t val = (uint16_t)v; 
+            tag_value = &val;
+            tag_value_size = 2;
+            break;
+        case 'I':
+            unsigned long long v = PyLong_AsUnsignedLongLong(value);
+            if ((v == -1) && PyErr_Occurred()) {
+                return -1;
+            }
+            if ((v < 0) || (v > UINT32_MAX)) {
+                PyErr_Format(
+                    PyExc_ValueError, 
+                    "Tag '%c%c' with value_type '%c' should have a value "
+                    "between %ld and %ld.",
+                    tag[0], tag[1], value_type[0], 0, UINT32_MAX);
+            }
+            uint32_t val = (uint32_t)v; 
+            tag_value = &val;
+            tag_value_size = 4;
+            break;
+        case 'f':
+            double dbl = PyFloat_AsDouble(value);
+            if ((dbl == -1.0L) && PyErr_Occurred()) {
+                return -1;
+            }
+            float flt = (float)dbl;
+            tag_value = &flt;
+            tag_value_size = 4;
     }
     Py_ssize_t new_size = before_tag_length + after_tag_length + 
                           tag_marker_length + tag_value_size;
