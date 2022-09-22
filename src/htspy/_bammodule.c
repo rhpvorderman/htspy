@@ -1040,6 +1040,24 @@ bam_array_type_to_python_type(uint8_t array_type){
     }
 }
 
+static inline uint8_t
+python_array_type_to_bam_type(char *array_type){
+    uint8_t tp = array_type[0];
+    switch (tp) {
+        case 'b': return 'c';
+        case 'B': return 'C';
+        case 'h': return 's';
+        case 'H': return 'S';
+        case 'i': return 'i';
+        case 'I': return 'I';
+        case 'f': return 'f';
+        case 'd': return 'd';
+        default:
+            PyErr_Format(PyExc_ValueError, "Unknown array type: %s", array_type);
+            return 0;
+    }
+}
+
 static const uint8_t * 
 skip_tag(const uint8_t *start, const uint8_t *end) {
     if (start >= end) {
@@ -1453,7 +1471,37 @@ static int _BamRecord_set_array_tag(BamRecord *self,
                                     uint8_t array_type, 
                                     PyObject *value)
 {
-    PyErr_SetString(PyExc_NotImplementedError, "Array tags are not yet implemented");
+    Py_buffer buffer;
+    uint8_t tp = array_type;
+    if (tp) {
+        PyObject_GetBuffer(value, &buffer, PyBUF_SIMPLE);
+    }
+    else {
+        PyObject_GetBuffer(value, &buffer, PyBUF_FORMAT);
+        tp = python_array_type_to_bam_type(buffer.format);
+    }
+    int itemsize = value_type_size(tp);
+    if (buffer.len % itemsize) {
+        PyErr_Format(
+            PyExc_ValueError, 
+            "Values for tag '%c%c' with type 'B%c' not a multiple of %d.",
+            tag[0], tag[1], tp, itemsize
+        );
+        goto error;
+    }
+    size_t array_size = buffer.len / itemsize;
+    if (array_size > UINT32_MAX) {
+        PyErr_Format(
+            PyExc_OverflowError,
+            "Array size of %ld, is larger than %d", array_size, UINT32_MAX
+        );
+        goto error;
+    }
+    uint8_t tag_marker[8] = {tag[0], tag[1], 'B', tp, 0, 0, 0, 0};
+    ((uint32_t *)tag_marker)[1] = (uint32_t)array_size;
+    return _BamRecord_replace_tag(self, tag, tag_marker, 8, buffer.buf, buffer.len);
+error:
+    PyBuffer_Release(&buffer);
     return -1;
 }
 
