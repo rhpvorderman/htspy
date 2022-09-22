@@ -75,6 +75,7 @@ def make_tag_value_function(sam_value_type,
         f"            \"Tag '%c%c' with value_type '{sam_value_type}' should have a value \"\n"
         f"            \"between %ld and %ld.\",\n"
         f"            tag[0], tag[1], {lower_bound}, {upper_bound});\n"
+        f"        return 0;\n"
         f"    }}\n"
         f"    (({c_type} *)value_store)[0] = ({c_type})v;\n"
         f"    return sizeof({c_type});\n"

@@ -1514,16 +1514,22 @@ static int _BamRecord_set_tag(BamRecord *self,
             break;
         case 'c':
             tag_value_size = StorePyObjectValue_c(value, tag_value_store, tag);
+            break;
         case 'C':
             tag_value_size = StorePyObjectValue_C(value, tag_value_store, tag);
+            break;
         case 's':
             tag_value_size = StorePyObjectValue_s(value, tag_value_store, tag);
+            break;
         case 'S':
             tag_value_size = StorePyObjectValue_S(value, tag_value_store, tag);
+            break;
         case 'i':
             tag_value_size = StorePyObjectValue_i(value, tag_value_store, tag);
+            break;
         case 'I':
             tag_value_size = StorePyObjectValue_I(value, tag_value_store, tag);
+            break;
         case 'f':
             dbl = PyFloat_AsDouble(value);
             if ((dbl == -1.0L) && PyErr_Occurred()) {
@@ -1531,6 +1537,7 @@ static int _BamRecord_set_tag(BamRecord *self,
             }
             ((float *)tag_value_store)[0] = (float)dbl;
             tag_value_size = 4;
+            break;
     }
     if (tag_value_size == 0) {
         return -1;
@@ -1618,7 +1625,7 @@ static PyObject *BamRecord_set_tag(BamRecord *self, PyObject *args, PyObject *kw
     if (_BamRecord_set_tag(self, tag, value_type, value) != 0) {
         return NULL;
     }
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 
