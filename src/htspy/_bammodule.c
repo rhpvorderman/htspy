@@ -1445,6 +1445,7 @@ static int _BamRecord_replace_tag(BamRecord *self,
     self->tags = tmp;
     self->block_size = new_block_size;
     Py_DECREF(old_tag_object);
+    return 0;
 }
 
 static int _BamRecord_set_array_tag(BamRecord *self,
@@ -1456,52 +1457,16 @@ static int _BamRecord_set_array_tag(BamRecord *self,
     return -1;
 }
 
-// Tag value store functions here. A lot of repetitive code. Is there a better
-// way to refactor this?
-static int StoreTagValue_c(PyObject *value, void *value_store, uint8_t *tag) 
-{
-    long long v = PyLong_AsLongLong(value);
-    if ((v == -1) && PyErr_Occurred()) {
-        return 0;
-    }
-    if ((v < INT8_MIN) || (v > INT8_MAX)) {
-        PyErr_Format(
-            PyExc_ValueError, 
-            "Tag '%c%c' with value_type 'c' should have a value "
-            "between %ld and %ld.",
-            tag[0], tag[1], INT8_MIN, INT8_MAX);
-    }
-    ((int8_t *)value_store)[0] = (int8_t)v; 
-    return 1;
-}
-
-static int StoreTagValue_s(PyObject *value, void *value_store, uint8_t *tag) 
-{
-    long long v = PyLong_AsLongLong(value);
-    if ((v == -1) && PyErr_Occurred()) {
-        return 0;
-    }
-    if ((v < INT16_MIN) || (v > INT16_MAX)) {
-        PyErr_Format(
-            PyExc_ValueError, 
-            "Tag '%c%c' with value_type 's' should have a value "
-            "between %ld and %ld.",
-            tag[0], tag[1], INT16_MIN, INT16_MAX);
-    }
-    ((int16_t *)value_store)[0] = (int16_t)v; 
-    return 2;
-}
-
-// end of tag value store functions.
-
 static int _BamRecord_set_tag(BamRecord *self, 
                               const uint8_t *tag, 
                               const uint8_t *value_type, 
                               PyObject *value) 
 {
-    void *tag_value;
-    size_t tag_value_size;
-    
+    uint8_t tag_value_store[8];
+    void *tag_value = tag_value_store;
+    size_t tag_value_size = 0;
+    double dbl;
+
     switch(value_type[0]) {
         default:
             PyErr_Format(PyExc_ValueError, "Unkown format: %c", value_type[0]);
@@ -1548,109 +1513,27 @@ static int _BamRecord_set_tag(BamRecord *self,
             }
             break;
         case 'c':
-            long long v = PyLong_AsLongLong(value);
-            if ((v == -1) && PyErr_Occurred()) {
-                return -1;
-            }
-            if ((v < INT8_MIN) || (v > INT8_MAX)) {
-                PyErr_Format(
-                    PyExc_ValueError, 
-                    "Tag '%c%c' with value_type '%c' should have a value "
-                    "between %ld and %ld.",
-                    tag[0], tag[1], value_type[0], INT8_MIN, INT8_MAX);
-            }
-            int8_t val = (int8_t)v; 
-            tag_value = &val;
-            tag_value_size = 1;
-            break;
-        case 's':
-            long long v = PyLong_AsLongLong(value);
-            if ((v == -1) && PyErr_Occurred()) {
-                return -1;
-            }
-            if ((v < INT16_MIN) || (v > INT16_MAX)) {
-                PyErr_Format(
-                    PyExc_ValueError, 
-                    "Tag '%c%c' with value_type '%c' should have a value "
-                    "between %ld and %ld.",
-                    tag[0], tag[1], value_type[0], INT16_MIN, INT16_MAX);
-            }
-            int16_t val = (int16_t)v; 
-            tag_value = &val;
-            tag_value_size = 2;
-            break;
-        case 'i':
-            long long v = PyLong_AsLongLong(value);
-            if ((v == -1) && PyErr_Occurred()) {
-                return -1;
-            }
-            if ((v < INT32_MIN) || (v > INT32_MAX)) {
-                PyErr_Format(
-                    PyExc_ValueError, 
-                    "Tag '%c%c' with value_type '%c' should have a value "
-                    "between %ld and %ld.",
-                    tag[0], tag[1], value_type[0], INT32_MIN, INT32_MAX);
-            }
-            int32_t val = (int32_t)v; 
-            tag_value = &val;
-            tag_value_size = 4;
-            break;
+            tag_value_size = StorePyObjectValue_c(value, tag_value_store, tag);
         case 'C':
-            unsigned long long v = PyLong_AsUnsignedLongLong(value);
-            if ((v == -1UL) && PyErr_Occurred()) {
-                return -1;
-            }
-            if ((v < 0) || (v > UINT8_MAX)) {
-                PyErr_Format(
-                    PyExc_ValueError, 
-                    "Tag '%c%c' with value_type '%c' should have a value "
-                    "between %ld and %ld.",
-                    tag[0], tag[1], value_type[0], 0, UINT8_MAX);
-            }
-            uint8_t val = (uint8_t)v; 
-            tag_value = &val;
-            tag_value_size = 1;
-            break;
+            tag_value_size = StorePyObjectValue_C(value, tag_value_store, tag);
+        case 's':
+            tag_value_size = StorePyObjectValue_s(value, tag_value_store, tag);
         case 'S':
-            unsigned long long v = PyLong_AsUnsignedLongLong(value);
-            if ((v == -1UL) && PyErr_Occurred()) {
-                return -1;
-            }
-            if ((v < 0) || (v > UINT16_MAX)) {
-                PyErr_Format(
-                    PyExc_ValueError, 
-                    "Tag '%c%c' with value_type '%c' should have a value "
-                    "between %ld and %ld.",
-                    tag[0], tag[1], value_type[0], 0, UINT16_MAX);
-            }
-            uint16_t val = (uint16_t)v; 
-            tag_value = &val;
-            tag_value_size = 2;
-            break;
+            tag_value_size = StorePyObjectValue_S(value, tag_value_store, tag);
+        case 'i':
+            tag_value_size = StorePyObjectValue_i(value, tag_value_store, tag);
         case 'I':
-            unsigned long long v = PyLong_AsUnsignedLongLong(value);
-            if ((v == -1UL) && PyErr_Occurred()) {
-                return -1;
-            }
-            if ((v < 0) || (v > UINT32_MAX)) {
-                PyErr_Format(
-                    PyExc_ValueError, 
-                    "Tag '%c%c' with value_type '%c' should have a value "
-                    "between %ld and %ld.",
-                    tag[0], tag[1], value_type[0], 0, UINT32_MAX);
-            }
-            uint32_t val = (uint32_t)v; 
-            tag_value = &val;
-            tag_value_size = 4;
-            break;
+            tag_value_size = StorePyObjectValue_I(value, tag_value_store, tag);
         case 'f':
-            double dbl = PyFloat_AsDouble(value);
+            dbl = PyFloat_AsDouble(value);
             if ((dbl == -1.0L) && PyErr_Occurred()) {
                 return -1;
             }
-            float flt = (float)dbl;
-            tag_value = &flt;
+            ((float *)tag_value_store)[0] = (float)dbl;
             tag_value_size = 4;
+    }
+    if (tag_value_size == 0) {
+        return -1;
     }
     uint8_t tag_marker[3] = {tag[0], tag[1], value_type[0]};
     return _BamRecord_replace_tag(self, tag, tag_marker, 3, tag_value, tag_value_size);

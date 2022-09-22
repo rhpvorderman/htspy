@@ -63,7 +63,7 @@ def make_tag_value_function(sam_value_type,
     return (
         f"\n"
         f"static int StorePyObjectValue_{sam_value_type}(PyObject *value, "
-        f"void *value_store, uint8_t *tag)"
+        f"void *value_store, const uint8_t *tag)"
         f"{{\n"
         f"    long long v = PyLong_AsLongLong(value);\n"
         f"    if ((v == -1L) && PyErr_Occurred()) {{\n"

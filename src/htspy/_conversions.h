@@ -82,7 +82,7 @@ static const uint16_t number_to_nucleotide_pair_le[256] = {
    The tag parameter is used to report back errors */
 
 
-static int StorePyObjectValue_c(PyObject *value, void *value_store, uint8_t *tag){
+static int StorePyObjectValue_c(PyObject *value, void *value_store, const uint8_t *tag){
     long long v = PyLong_AsLongLong(value);
     if ((v == -1L) && PyErr_Occurred()) {
         return 0;
@@ -99,7 +99,7 @@ static int StorePyObjectValue_c(PyObject *value, void *value_store, uint8_t *tag
 }
 
 
-static int StorePyObjectValue_C(PyObject *value, void *value_store, uint8_t *tag){
+static int StorePyObjectValue_C(PyObject *value, void *value_store, const uint8_t *tag){
     long long v = PyLong_AsLongLong(value);
     if ((v == -1L) && PyErr_Occurred()) {
         return 0;
@@ -116,7 +116,7 @@ static int StorePyObjectValue_C(PyObject *value, void *value_store, uint8_t *tag
 }
 
 
-static int StorePyObjectValue_s(PyObject *value, void *value_store, uint8_t *tag){
+static int StorePyObjectValue_s(PyObject *value, void *value_store, const uint8_t *tag){
     long long v = PyLong_AsLongLong(value);
     if ((v == -1L) && PyErr_Occurred()) {
         return 0;
@@ -133,7 +133,7 @@ static int StorePyObjectValue_s(PyObject *value, void *value_store, uint8_t *tag
 }
 
 
-static int StorePyObjectValue_S(PyObject *value, void *value_store, uint8_t *tag){
+static int StorePyObjectValue_S(PyObject *value, void *value_store, const uint8_t *tag){
     long long v = PyLong_AsLongLong(value);
     if ((v == -1L) && PyErr_Occurred()) {
         return 0;
@@ -150,7 +150,7 @@ static int StorePyObjectValue_S(PyObject *value, void *value_store, uint8_t *tag
 }
 
 
-static int StorePyObjectValue_i(PyObject *value, void *value_store, uint8_t *tag){
+static int StorePyObjectValue_i(PyObject *value, void *value_store, const uint8_t *tag){
     long long v = PyLong_AsLongLong(value);
     if ((v == -1L) && PyErr_Occurred()) {
         return 0;
@@ -167,7 +167,7 @@ static int StorePyObjectValue_i(PyObject *value, void *value_store, uint8_t *tag
 }
 
 
-static int StorePyObjectValue_I(PyObject *value, void *value_store, uint8_t *tag){
+static int StorePyObjectValue_I(PyObject *value, void *value_store, const uint8_t *tag){
     long long v = PyLong_AsLongLong(value);
     if ((v == -1L) && PyErr_Occurred()) {
         return 0;
