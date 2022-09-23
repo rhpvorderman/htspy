@@ -218,11 +218,26 @@ def test_set_tag(empty_bam, tag, raw_tag, value):
     assert empty_bam._tags == raw_tag
 
 
-@pytest.mark.parametrize("value", [
-    array.array(c, [1, 2, 3]) for c in "bBhHiIf"])
+ARRAY_VALUES = [(array.array(python_type, [1, 2, 3]), bam_type)
+                for python_type, bam_type in
+                zip("bBhHiIf", "cCsSiIf")]
+
+
+@pytest.mark.parametrize("value", ARRAY_VALUES)
 def test_set_tag_array_format(value: array.array):
+    value = value[0]
     empty_bam = BamRecord()
     empty_bam.set_tag("XX", value)
     arr: memoryview = empty_bam.get_tag("XX")
     assert list(arr) == list(value)
     assert arr.format == value.typecode
+
+
+@pytest.mark.parametrize("value", ARRAY_VALUES[2:])
+def test_set_tag_itemsize_error(value):
+    value, typecode = value
+    b = value.tobytes()[:-1]
+    empty_bam = BamRecord()
+    with pytest.raises(ValueError) as error:
+        empty_bam.set_tag("XX", b, "B" + typecode)
+    error.match("uffer size not a multiple of")

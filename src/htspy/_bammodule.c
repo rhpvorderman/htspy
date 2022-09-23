@@ -1488,8 +1488,9 @@ static int _BamRecord_set_array_tag(BamRecord *self,
     if (buffer.len % itemsize) {
         PyErr_Format(
             PyExc_ValueError, 
-            "Values for tag '%c%c' with type 'B%c' not a multiple of %d.",
-            tag[0], tag[1], tp, itemsize
+            "Cannot set tag '%c%c' with type 'B%c' using %R. " 
+            "Buffer size not a multiple of %d.",
+            tag[0], tag[1], tp, value, itemsize
         );
         goto error;
     }
