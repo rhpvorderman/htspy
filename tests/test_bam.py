@@ -216,3 +216,13 @@ def test_set_tag(empty_bam, tag, raw_tag, value):
         value = raw_tag[8:]
     empty_bam.set_tag(tag, value, value_type)
     assert empty_bam._tags == raw_tag
+
+
+@pytest.mark.parametrize("value", [
+    array.array(c, [1, 2, 3]) for c in "bBhHiIf"])
+def test_set_tag_array_format(value: array.array):
+    empty_bam = BamRecord()
+    empty_bam.set_tag("XX", value)
+    arr: memoryview = empty_bam.get_tag("XX")
+    assert list(arr) == list(value)
+    assert arr.format == value.typecode
