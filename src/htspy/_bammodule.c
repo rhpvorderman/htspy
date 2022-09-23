@@ -1474,10 +1474,14 @@ static int _BamRecord_set_array_tag(BamRecord *self,
     Py_buffer buffer;
     uint8_t tp = array_type;
     if (tp) {
-        PyObject_GetBuffer(value, &buffer, PyBUF_SIMPLE);
+        if (PyObject_GetBuffer(value, &buffer, PyBUF_SIMPLE) != 0) {
+            return -1;
+        }
     }
     else {
-        PyObject_GetBuffer(value, &buffer, PyBUF_FORMAT);
+        if (PyObject_GetBuffer(value, &buffer, PyBUF_FORMAT) != 0) {
+            return -1;
+        }
         tp = python_array_type_to_bam_type(buffer.format);
     }
     int itemsize = value_type_size(tp);
