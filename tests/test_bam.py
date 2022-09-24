@@ -241,3 +241,34 @@ def test_set_tag_itemsize_error(value):
     with pytest.raises(ValueError) as error:
         empty_bam.set_tag("XX", b, "B" + typecode)
     error.match("uffer size not a multiple of")
+
+
+def test_set_tag_non_ascii_error():
+    bam = BamRecord()
+    with pytest.raises(ValueError) as error:
+        bam.set_tag("Xë", "somestring")
+    error.match("ASCII")
+
+
+def test_set_tag_too_long_tag():
+    bam = BamRecord()
+    with pytest.raises(ValueError) as error:
+        bam.set_tag("AVA", "somestring")
+    error.match("2")
+    error.match("length")
+
+
+def test_set_tag_value_type_non_ascii():
+    bam = BamRecord()
+    with pytest.raises(ValueError) as error:
+        bam.set_tag("AV", "somestring", "Č")
+    error.match("ASCII")
+
+
+def test_set_tag_value_type_too_long():
+    bam = BamRecord()
+    with pytest.raises(ValueError) as error:
+        bam.set_tag("AV", "somestring", "ZZZ")
+    error.match("length")
+
+
