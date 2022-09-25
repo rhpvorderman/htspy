@@ -155,11 +155,16 @@ TEST_TAGS = (
         # B tag: first type letter, then count (of type uint32_t) then values.
         ("ST", b"STBc" + struct.pack("<Ibbb", 3, -20, 10, -126), [-20, 10, -126]),
         ("UV", b"UVBC" + struct.pack("<IBBB", 3, 65, 129, 203), [65, 129, 203]),
-        ("WX", b"WXBs" + struct.pack("<Ihhh", 3, -4000, 4000, 2000), [-4000, 4000, 2000]),
-        ("YZ", b"YZBS" + struct.pack("<IHHH", 3, 4000, 40000, 65000), [4000, 40000, 65000]),
-        ("AA", b"AABi" + struct.pack("<Iiii", 3, -80000, 80000, 2_000_000_000), [-80000, 80000, 2_000_000_000]),
-        ("BB", b"BBBI" + struct.pack("<IIII", 3, 80000, 2_000_000_000, 4_000_000_000), [80000, 2_000_000_000, 4_000_000_000]),
-        ("CC", b"CCBf" + struct.pack("<Ifff", 3, 1.1, 2.2, 3.3), [float32(1.1), float32(2.2), float32(3.3)]),
+        ("WX", b"WXBs" + struct.pack("<Ihhh", 3, -4000, 4000, 2000),
+         [-4000, 4000, 2000]),
+        ("YZ", b"YZBS" + struct.pack("<IHHH", 3, 4000, 40000, 65000),
+         [4000, 40000, 65000]),
+        ("AA", b"AABi" + struct.pack("<Iiii", 3, -80000, 80000, 2_000_000_000),
+         [-80000, 80000, 2_000_000_000]),
+        ("BB", b"BBBI" + struct.pack("<IIII", 3, 80000, 2_000_000_000, 4_000_000_000),
+         [80000, 2_000_000_000, 4_000_000_000]),
+        ("CC", b"CCBf" + struct.pack("<Ifff", 3, 1.1, 2.2, 3.3),
+         [float32(1.1), float32(2.2), float32(3.3)]),
         ("DD", b"DDBd" + struct.pack("<Iddd", 3, 1.1, 2.2, 3.3), [1.1, 2.2, 3.3]),
 )
 
@@ -236,7 +241,8 @@ def test_set_tag_array_format(value: array.array):
     value = value[0]
     empty_bam = BamRecord()
     empty_bam.set_tag("XX", value)
-    arr: memoryview = empty_bam.get_tag("XX")
+    # Mypy gets confused by generic get_tag return types
+    arr: memoryview = empty_bam.get_tag("XX")  # type: ignore
     assert list(arr) == list(value)
     assert arr.format == value.typecode
 
@@ -283,7 +289,7 @@ def test_set_tag_value_type_too_long():
 @pytest.mark.parametrize(
     "value_type",
     ["c", "C", "s", "S", "i", "I", "f", "Z", "A",
-     "Bc", "BC", "Bs", "BS", "Bi", "BI", "Bf" ]
+     "Bc", "BC", "Bs", "BS", "Bi", "BI", "Bf"]
 )
 def test_set_tag_wrong_types(value_type):
     # Strings do not support the buffer interface and are therefore
@@ -316,7 +322,7 @@ def test_set_tag_autodetect_from_type(value, value_type):
 
 
 def test_set_tag_correctly_replaces():
-    bam=BamRecord()
+    bam = BamRecord()
     # Test several tag replacements to make sure all code is run.
     bam.set_tag("XX", 1, 'C')  # Empty tag object gets filled with first value
     assert bam.get_tag("XX") == 1
@@ -333,9 +339,9 @@ def test_set_tag_correctly_replaces():
 
 @pytest.mark.parametrize(
     ["value_type", "lower", "upper"], [
-        ("c", -(2 ** 7), 2 ** 7 -1),
+        ("c", -(2 ** 7), 2 ** 7 - 1),
         ("C", 0, 2 ** 8 - 1),
-        ("s", -(2 ** 15), 2 ** 15 -1),
+        ("s", -(2 ** 15), 2 ** 15 - 1),
         ("S", 0, 2 ** 16 - 1),
         ("i", -(2 ** 31), 2 ** 31 - 1),
         ("I", 0, 2 ** 32 - 1)
@@ -347,7 +353,7 @@ def test_tag_value_boundaries(value_type, lower, upper):
     bam.set_tag("XX", lower, value_type)
     bam.set_tag("XY", upper, value_type)
     with pytest.raises(ValueError) as lower_error:
-        bam.set_tag("XZ", lower -1, value_type)
+        bam.set_tag("XZ", lower - 1, value_type)
     lower_error.match(str(lower))
     with pytest.raises(ValueError) as upper_error:
         bam.set_tag("XZ", upper + 1, value_type)
@@ -382,7 +388,7 @@ def test_set_tag_block_size_overflow():
     bam = BamRecord()
     # This array is equal to the maximum size of a bamrecord in memory.
     # Therefore it will not fit even though it fits in an array tag type.
-    block_size_array = bytes(2 ** 32 -1)
+    block_size_array = bytes(2 ** 32 - 1)
     with pytest.raises(OverflowError) as error:
         bam.set_tag("XX", block_size_array)
     error.match("BamRecord")
