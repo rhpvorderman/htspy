@@ -272,3 +272,14 @@ def test_set_tag_value_type_too_long():
     error.match("length")
 
 
+@pytest.mark.parametrize(
+    "value_type",
+    ["c", "C", "s", "S", "i", "I", "f", "Z", "A",
+     "Bc", "BC", "Bs", "BS", "Bi", "BI", "Bf" ]
+)
+def test_set_tag_wrong_types(value_type):
+    # Strings do not support the buffer interface and are therefore
+    # illegal for B type tags.
+    value = "a" if value_type.startswith("B") else b"a"
+    with pytest.raises(TypeError):
+        BamRecord().set_tag("XX", value, value_type)
