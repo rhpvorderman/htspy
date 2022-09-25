@@ -1612,11 +1612,11 @@ PyDoc_STRVAR(BamRecord_set_tag__doc__,
 "  tag\n"
 "    A two-letter ASCII string.\n"
 "  value\n"
-"    The value to store in the tag.\n"
+"    The value to store in the tag. Using None deletes the tag.\n"
 "  value_type\n"
 "    The value type of the tag. \n"
 "    By default this automatically determined by the tag if tag is in the \n" 
-"    SAMtags specification or else the value.\n"
+"    SAMtags specification or else the type is determined by the value.\n"
 "\n");
 
 #define BAMRECORD_SET_TAG_METHODDEF    \
