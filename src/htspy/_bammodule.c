@@ -1483,6 +1483,9 @@ static int _BamRecord_set_array_tag(BamRecord *self,
             return -1;
         }
         tp = python_array_type_to_bam_type(buffer.format);
+        if (tp == 0) {  // Extremely unlikely. Unless python changes its formats.
+            goto error;
+        }
     }
     int itemsize = value_type_size(tp);
     if (buffer.len % itemsize) {
