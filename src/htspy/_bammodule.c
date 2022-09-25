@@ -1501,7 +1501,7 @@ static int _BamRecord_set_array_tag(BamRecord *self,
     if (array_size > UINT32_MAX) {
         PyErr_Format(
             PyExc_OverflowError,
-            "Array size of %ld, is larger than %d", array_size, UINT32_MAX
+            "Array size of %ld, is larger than %uld", array_size, UINT32_MAX
         );
         goto error;
     }

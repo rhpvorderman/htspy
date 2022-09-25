@@ -296,6 +296,7 @@ def test_set_tag_wrong_types(value_type):
     (array.array("i", [1]), "Bi"),
     (array.array("I", [1]), "BI"),
     (array.array("f", [1]), "Bf"),
+    (b"1", "BC"),
 ])
 def test_set_tag_autodetect_from_type(value, value_type):
     bam = BamRecord()
@@ -359,3 +360,11 @@ def test_set_tag_a_wrong_size(value):
     with pytest.raises(ValueError) as error:
         bam.set_tag("XX", value, "A")
     error.match("exactly one")
+
+
+def test_set_tag_array_too_large():
+    bam = BamRecord()
+    too_large_array = bytes(2 ** 32)
+    with pytest.raises(OverflowError) as error:
+        bam.set_tag("XX", too_large_array)
+    error.match(str(2 ** 32 - 1))
