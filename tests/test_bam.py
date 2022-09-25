@@ -343,3 +343,19 @@ def test_tag_value_boundaries(value_type, lower, upper):
     with pytest.raises(ValueError) as upper_error:
         bam.set_tag("XZ", upper + 1, value_type)
     upper_error.match(str(upper))
+
+
+@pytest.mark.parametrize("value_type", ["A", "Z"])
+def test_set_tag_non_ascii(value_type):
+    bam = BamRecord()
+    with pytest.raises(ValueError) as error:
+        bam.set_tag("XX", "Ä", value_type)
+    assert error.match("ASCII")
+
+
+@pytest.mark.parametrize("value", ["", "12"])
+def test_set_tag_a_wrong_size(value):
+    bam = BamRecord()
+    with pytest.raises(ValueError) as error:
+        bam.set_tag("XX", value, "A")
+    error.match("exactly one")
