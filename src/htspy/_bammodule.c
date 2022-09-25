@@ -621,7 +621,6 @@ static PyMemberDef BamRecord_members[] = {
     {"_cigar", T_OBJECT_EX, offsetof(BamRecord, bamcigar), READONLY},
     {"_seq", T_OBJECT_EX, offsetof(BamRecord, seq), READONLY},
     {"_qual", T_OBJECT_EX, offsetof(BamRecord, qual), READONLY},
-    {"_tags", T_OBJECT_EX, offsetof(BamRecord, tags), READONLY},
     
     // Pythonic naming for convenient access. Everything here should be 
     // READONLY. Values that are not readonly should be set trough properties 
@@ -828,7 +827,7 @@ static PyGetSetDef BamRecord_properties[] = {
      BamRecord_read_name_doc, NULL},
     {"_read_name", (getter)BamRecord_get__read_name, (setter)BamRecord_set__read_name,
      BamRecord__read_name_doc, NULL},
-    {"tags", (getter)BamRecord_get_tags, (setter)BamRecord_set_tags,
+    {"_tags", (getter)BamRecord_get_tags, (setter)BamRecord_set_tags,
      BamRecord_tags_doc, NULL},
     {"cigar", (getter)BamRecord_get_cigar, (setter)BamRecord_set_cigar,
      BamRecord_cigar_doc, NULL},

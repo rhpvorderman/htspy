@@ -166,7 +166,7 @@ TEST_TAGS = (
 
 @pytest.mark.parametrize(["tag", "raw_tag", "result"], TEST_TAGS)
 def test_get_tag(empty_bam, tag, raw_tag, result):
-    empty_bam.tags = raw_tag
+    empty_bam._tags = raw_tag
     ref_before = sys.getrefcount(raw_tag)
     retrieved_tag = empty_bam.get_tag(tag)
     if isinstance(retrieved_tag, memoryview):
@@ -183,7 +183,7 @@ def concatenate_tags():
 
 @pytest.mark.parametrize(["tag", "raw_tag", "result"], concatenate_tags())
 def test_get_tag_correct_skip(empty_bam, tag, raw_tag, result):
-    empty_bam.tags = raw_tag
+    empty_bam._tags = raw_tag
     retrieved_tag = empty_bam.get_tag(tag)
     if isinstance(retrieved_tag, memoryview):
         retrieved_tag = retrieved_tag.tolist()
@@ -202,7 +202,7 @@ def truncated_tags():
 
 @pytest.mark.parametrize(["tag", "trunc_tag"], truncated_tags())
 def test_trucated_tag_error(empty_bam, tag, trunc_tag):
-    empty_bam.tags = trunc_tag
+    empty_bam._tags = trunc_tag
     with pytest.raises(ValueError) as error:
         empty_bam.get_tag(tag)
     error.match("truncated tag")
