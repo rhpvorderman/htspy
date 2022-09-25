@@ -150,7 +150,7 @@ BamCigar_get_buffer(BamCigar *self, Py_buffer *view, int flags) {
     }
     Py_INCREF(self);
     view->obj = (PyObject *)self;
-    view->buf = (void *)self->cigar;
+    view->buf = (void *)self->cigar;  // Discard const, readonly is set.
     view->len = sizeof(uint32_t) * Py_SIZE(self);
     view->readonly = 1;
     view->itemsize = sizeof(uint32_t);
@@ -449,8 +449,10 @@ BamCigarIter__next__(BamCigarIter * self) {
     Py_ssize_t cigar_op = bam_cigar_op(c);
     Py_ssize_t cigar_oplen = bam_cigar_oplen(c);
     self->pos += 1;
-    return PyTuple_Pack(2,
-        PyLong_FromSsize_t(cigar_op), PyLong_FromSsize_t(cigar_oplen));
+    PyObject * tup = PyTuple_New(2);
+    PyTuple_SET_ITEM(tup, 0, PyLong_FromSsize_t(cigar_op));
+    PyTuple_SET_ITEM(tup, 1, PyLong_FromSsize_t(cigar_oplen));
+    return tup;
 }
 
 static PyObject *
@@ -619,7 +621,6 @@ static PyMemberDef BamRecord_members[] = {
     {"_cigar", T_OBJECT_EX, offsetof(BamRecord, bamcigar), READONLY},
     {"_seq", T_OBJECT_EX, offsetof(BamRecord, seq), READONLY},
     {"_qual", T_OBJECT_EX, offsetof(BamRecord, qual), READONLY},
-    {"_tags", T_OBJECT_EX, offsetof(BamRecord, tags), READONLY},
     
     // Pythonic naming for convenient access. Everything here should be 
     // READONLY. Values that are not readonly should be set trough properties 
@@ -826,7 +827,7 @@ static PyGetSetDef BamRecord_properties[] = {
      BamRecord_read_name_doc, NULL},
     {"_read_name", (getter)BamRecord_get__read_name, (setter)BamRecord_set__read_name,
      BamRecord__read_name_doc, NULL},
-    {"tags", (getter)BamRecord_get_tags, (setter)BamRecord_set_tags,
+    {"_tags", (getter)BamRecord_get_tags, (setter)BamRecord_set_tags,
      BamRecord_tags_doc, NULL},
     {"cigar", (getter)BamRecord_get_cigar, (setter)BamRecord_set_cigar,
      BamRecord_cigar_doc, NULL},
@@ -999,12 +1000,702 @@ BamRecord_set_sequence(BamRecord *self, PyObject *const *args, Py_ssize_t nargs)
     Py_RETURN_NONE;
 }
 
-PyDoc_STRVAR(BamRecord_to_bytes__doc__,
-"Return the BAM record as a bytesobject that can be written into a file.");
+static inline int
+value_type_size(uint8_t value_type) {
+    switch(value_type) {
+        case 'A': 
+        case 'c': 
+        case 'C':
+            return 1;
+        case 's': 
+        case 'S':
+            return 2;
+        case 'f': 
+        case 'i': 
+        case 'I':
+            return 4; 
+        case 'd':
+            return 8;
+        default:
+            PyErr_Format(PyExc_ValueError, "Unkown value type: %c", value_type);
+            return 0;
+    }
+}
 
-#define BAMRECORD_TO_BYTES_METHODDEF    \
-    {"to_bytes", (PyCFunction)(void(*)(void))BamRecord_to_bytes, METH_NOARGS, \
-     BamRecord_to_bytes__doc__}
+static inline char *
+bam_array_type_to_python_type(uint8_t array_type){
+    switch (array_type) {
+        case 'c': return "b";
+        case 'C': return "B";
+        case 's': return "h";
+        case 'S': return "H";
+        case 'i': return "i";
+        case 'I': return "I";
+        case 'f': return "f";
+        case 'd': return "d";
+        default:
+            PyErr_Format(PyExc_ValueError, "Unknown array type: %c", array_type);
+            return NULL;
+    }
+}
+
+static inline uint8_t
+python_array_type_to_bam_type(char *array_type){
+    uint8_t tp = array_type[0];
+    switch (tp) {
+        case 'b': return 'c';
+        case 'B': return 'C';
+        case 'h': return 's';
+        case 'H': return 'S';
+        case 'i': return 'i';
+        case 'I': return 'I';
+        case 'f': return 'f';
+        case 'd': return 'd';
+        default:
+            PyErr_Format(PyExc_ValueError, "Unknown array type: %s", array_type);
+            return 0;
+    }
+}
+
+static const uint8_t * 
+skip_tag(const uint8_t *start, const uint8_t *end) {
+    if (start >= end) {
+        return end;
+    }
+    if ((end - start) < 4) {
+        if ((end - start) < 2) {
+            PyErr_SetString(PyExc_ValueError, "truncated tag");
+        } else {
+            PyErr_Format(PyExc_ValueError, "truncated tag %c%c", 
+                start[0], start[1]);
+        }
+        return NULL; 
+    }
+    uint8_t type = start[2];
+    const uint8_t *value_start = start + 3;
+    const uint8_t *value_end;
+    int value_length;
+    size_t max_length;
+    switch(type) {
+        case 'H':
+        case 'Z':
+            max_length = end - value_start;
+            // strnlen could also have been appropriate but that does not allow
+            // for easy error checking when no terminating NULL is found.
+            uint8_t *string_stop = memchr(value_start, 0, max_length);
+            if (string_stop == NULL) {
+                PyErr_Format(
+                    PyExc_ValueError, 
+                    "truncated tag: %c%c has a string value not terminated by NULL",
+                    start[0], start[1]);
+                return NULL;
+            }
+            return string_stop + 1;
+        case 'B':
+            type = start[3];
+            value_length = value_type_size(type);
+            if (value_length == 0) {
+                return NULL;
+            }
+            value_start = start + 8;
+            if (value_start >= end) {
+                PyErr_Format(PyExc_ValueError, "truncated tag %c%c", 
+                    start[0], start[1]);
+                    return NULL;
+            }
+            uint32_t array_length = *((uint32_t *)(start + 4));
+            value_end = value_start + (array_length * value_length);
+            if (value_end > end) {
+                PyErr_Format(PyExc_ValueError, "truncated tag %c%c", 
+                    start[0], start[1]);
+                    return NULL;          
+            }
+            return value_end;
+        default:
+            value_length = value_type_size(type);
+            if (value_length == 0) {
+                return NULL;
+            }
+            value_end = value_start + value_length;
+            if (value_end > end) {
+                PyErr_Format(PyExc_ValueError, "truncated tag %c%c", 
+                    start[0], start[1]);
+                    return NULL;          
+            }
+            return value_end;
+    }
+}
+
+static int
+find_tag(const uint8_t *tags, size_t tags_length, const uint8_t *tag, 
+         const uint8_t **found_tag)
+{
+    uint8_t tag_left_char = tag[0];
+    uint8_t tag_right_char = tag[1];
+    const uint8_t *end_ptr = tags + tags_length;
+    const uint8_t *tag_ptr = tags;
+    const uint8_t *next_tag_ptr;
+    while (tag_ptr < end_ptr) {
+        if (tag_ptr + 2 >= (end_ptr)) {
+            PyErr_SetString(PyExc_ValueError, "truncated tag");
+            return -1;
+        }
+        if ((tag_ptr[0] == tag_left_char) && (tag_ptr[1]) == tag_right_char) {
+            *found_tag = tag_ptr;
+            return 0;
+        }
+        next_tag_ptr = skip_tag(tag_ptr, end_ptr);
+        if (next_tag_ptr == NULL) {
+            return -1;
+        }
+        tag_ptr = next_tag_ptr;
+    }
+    *found_tag = NULL;
+    return 0;
+}
+
+static PyObject * 
+tag_ptr_to_pyobject(const uint8_t *start, const uint8_t *end, PyObject *tag_object){
+    if (start >= end) {
+        PyErr_SetString(PyExc_RuntimeError, 
+                        "tag_ptr_to_pyobject called with end before start.");
+        return NULL;
+    }
+    if ((end - start) < 4) {
+        if ((end -start) < 2) {
+            PyErr_SetString(PyExc_ValueError, "truncated tag");
+        } else {
+            PyErr_Format(PyExc_ValueError, "truncated tag %c%c", 
+                start[0], start[1]);
+        }
+        return NULL; 
+    }
+    uint8_t type = start[2];
+    const uint8_t *value_start = start + 3;
+    uint8_t *value_end;
+    Py_ssize_t max_length = end - value_start;
+    switch(type) {
+        case 'A':
+            // Only ASCII chars are allowed.
+            return PyUnicode_DecodeASCII((char *)value_start, 1, NULL);
+        case 'Z':
+            value_end = memchr(value_start, 0, max_length);
+            if (value_end == NULL) {
+                break;
+            }
+            return PyUnicode_DecodeASCII((char *)value_start, 
+                                         value_end - value_start, NULL);
+        case 'c':
+            return PyLong_FromLongLong(*(int8_t *)value_start);
+        case 'C':
+            return PyLong_FromLongLong(*(uint8_t *)value_start);
+        case 's':
+            if (max_length < 2) break;
+            return PyLong_FromLongLong(*(int16_t *)value_start);
+        case 'S':
+            if (max_length < 2) break;
+            return PyLong_FromLongLong(*(uint16_t *)value_start);
+        case 'i':
+            if (max_length < 4) break;
+            return PyLong_FromLongLong(*(int32_t *)value_start);
+        case 'I':
+            if (max_length < 4) break;
+            return PyLong_FromLongLong(*(uint32_t *)value_start);
+        case 'f':
+            if (max_length < 4) break;
+            return PyFloat_FromDouble(*(float *)value_start);
+        case 'B':
+            // Export a memoryview, as this is the closest thing to a builtin 
+            // array in python. Iterating over it works.
+            if (max_length < 5) 
+                break;
+            uint8_t array_type = value_start[0];
+            uint32_t array_count = *(uint32_t *)(value_start + 1);
+            const uint8_t *array_start = value_start + 5;
+            size_t array_max_length = end - array_start;
+            int itemsize = value_type_size(array_type);
+            if (!itemsize) 
+                return NULL;
+            char * python_array_type = bam_array_type_to_python_type(array_type);
+            if (!python_array_type) 
+                return NULL;
+            size_t array_size = itemsize * array_count;
+            if (array_size > array_max_length) break;
+            Py_INCREF(tag_object);
+            Py_buffer array_view = {
+                .buf = (void *)(value_start + 5),  // Discard const, readonly is set.
+                .obj = tag_object,
+                .len = array_size,
+                .itemsize = itemsize,
+                .readonly = 1,
+                .format = python_array_type,
+                .ndim = 1,
+                // Fields below are automatically set by PyMemoryView_FromBuffer
+                .shape = NULL,
+                .strides = NULL,
+                .suboffsets = NULL,
+                .internal = NULL,
+            };
+            PyObject *memview = PyMemoryView_FromBuffer(&array_view);
+            // PyMemoryView_FromBuffer sets this to NULL, but the underlying 
+            // object should be properly decreased in reference count.
+            ((PyMemoryViewObject *)memview)->mbuf->master.obj = tag_object;
+            return memview;
+        case 'H':
+            PyErr_SetString(PyExc_NotImplementedError,
+                            "Decoding 'H' type tags is not yet supported.");
+            return NULL;
+        default:
+            PyErr_Format(PyExc_ValueError, 
+                         "Unknown tag type: %c for tag %c%c", 
+                         type, start[0], start[1]);
+            return NULL;
+    }
+    PyErr_Format(PyExc_ValueError, "truncated tag %c%c", 
+                 start[0], start[1]);
+    return NULL; 
+}
+
+PyDoc_STRVAR(BamRecord_get_tag__doc__,
+"get_tag($self, tag, /)\n"
+"--\n"
+"\n"
+"Returns the value of a tag. Raises a KeyError if not found.\n"
+"\n"
+"  tag\n"
+"    A two-letter ASCII string.\n"
+"\n");
+
+#define BAMRECORD_GET_TAG_METHODDEF    \
+    {"get_tag", (PyCFunction)(void(*)(void))BamRecord_get_tag, METH_O, \
+     BamRecord_get_tag__doc__}
+
+static PyObject * 
+BamRecord_get_tag(BamRecord *self, PyObject *tag) {
+    if (!PyUnicode_CheckExact(tag)) {
+        PyErr_Format(PyExc_TypeError, "tag must be of type str, got %s.", 
+                     Py_TYPE(tag)->tp_name);
+        return NULL;
+    }
+    if (!PyUnicode_IS_COMPACT_ASCII(tag)) {
+        PyErr_SetString(PyExc_ValueError, "tag contains non-ASCII characters");
+        return NULL;
+    }
+    if (!(PyUnicode_GET_LENGTH(tag) == 2)) {
+        PyErr_Format(PyExc_ValueError, "tag must have length 2, got %ld", 
+                                        PyUnicode_GET_LENGTH(tag));
+        return NULL;
+    }
+    uint8_t *search_tag = (uint8_t *)PyUnicode_DATA(tag);
+    uint8_t *tags = (uint8_t *)PyBytes_AS_STRING(self->tags);
+    Py_ssize_t tags_length = PyBytes_GET_SIZE(self->tags);
+    const uint8_t *found_tag = NULL;
+    int ret = find_tag(tags, tags_length, search_tag, &found_tag);
+    if (ret != 0) {
+        return NULL;
+    }
+    if (found_tag == NULL) {
+        PyErr_Format(PyExc_KeyError, "Tag not found: %S", tag);
+        return NULL;
+    }
+    return tag_ptr_to_pyobject(found_tag, tags + tags_length, self->tags);
+}
+
+static const char *tag_to_value_type(const uint8_t *tag) {
+    // Need to use a macro here for use in case statements.
+    #define TAG_KEY(left, right) ((uint16_t)left << 8 | (uint16_t)(right))
+    
+    // Only uppercase tags are in the SAMtags spec, so alternatively a 26 by 36
+    // lookup table can be used, but the switch statement is easier to use and maintain.
+    // Let the compiler optimize for now.
+    uint16_t key = TAG_KEY(tag[0], tag[1]);
+    switch (key) {
+        case TAG_KEY('T', 'S'):
+            return "A";
+        case TAG_KEY('A', 'M'):
+        case TAG_KEY('A', 'S'):
+        case TAG_KEY('C', 'M'):
+        case TAG_KEY('C', 'P'):
+        case TAG_KEY('F', 'I'):
+        case TAG_KEY('H', '0'):
+        case TAG_KEY('H', '1'):
+        case TAG_KEY('H', '2'):
+        case TAG_KEY('H', 'I'):
+        case TAG_KEY('I', 'H'):
+        case TAG_KEY('M', 'Q'):
+        case TAG_KEY('N', 'H'):
+        case TAG_KEY('N', 'M'):
+        case TAG_KEY('O', 'P'):
+        case TAG_KEY('P', 'Q'):
+        case TAG_KEY('S', 'M'):
+        case TAG_KEY('T', 'C'):
+        case TAG_KEY('U', 'Q'):
+            return "i";
+        case TAG_KEY('B', 'C'):
+        case TAG_KEY('B', 'Q'):
+        case TAG_KEY('B', 'Z'):
+        case TAG_KEY('C', 'B'):
+        case TAG_KEY('C', 'C'):
+        case TAG_KEY('C', 'O'):
+        case TAG_KEY('C', 'Q'):
+        case TAG_KEY('C', 'R'):
+        case TAG_KEY('C', 'S'):
+        case TAG_KEY('C', 'T'):
+        case TAG_KEY('C', 'Y'):
+        case TAG_KEY('E', '2'):
+        case TAG_KEY('F', 'S'):
+        case TAG_KEY('L', 'B'):
+        case TAG_KEY('M', 'C'):
+        case TAG_KEY('M', 'D'):
+        case TAG_KEY('M', 'I'):
+        case TAG_KEY('M', 'M'):
+        case TAG_KEY('O', 'A'):
+        case TAG_KEY('O', 'C'):
+        case TAG_KEY('O', 'Q'):
+        case TAG_KEY('O', 'X'):
+        case TAG_KEY('P', 'G'):
+        case TAG_KEY('P', 'T'):
+        case TAG_KEY('P', 'U'):
+        case TAG_KEY('Q', '2'):
+        case TAG_KEY('Q', 'T'):
+        case TAG_KEY('Q', 'X'):
+        case TAG_KEY('R', '2'):
+        case TAG_KEY('R', 'G'):
+        case TAG_KEY('R', 'X'):
+        case TAG_KEY('S', 'A'):
+        case TAG_KEY('U', '2'):
+            return "Z";
+        case TAG_KEY('M', 'L'):
+            return "BC";
+        case TAG_KEY('F', 'Z'):
+            return "BS";
+        case TAG_KEY('C', 'G'):
+            return "BI";
+        default:
+            return NULL;
+    }
+}
+
+static const char *PyObject_to_value_type(PyObject *value) {
+    if (PyUnicode_CheckExact(value)) {
+        return "Z";
+    }
+    if (PyLong_CheckExact(value)) {
+        return "i";
+    }
+    if (PyFloat_CheckExact(value)) {
+        return "f";
+    }
+    if (PyObject_CheckBuffer(value)) {
+        return "B";
+    }
+    PyErr_Format(PyExc_ValueError, 
+                 "Could not determine appropriate tag type for %R", value);
+    return NULL;
+}
+
+/**
+ * @brief Add, replace or delete a tag on a BamRecord
+ * 
+ * This function checks if the tag already exists, if so it replaces it.
+ * If the tag does not exist, it adds the new tag. To delete a tag, use
+ * tag_marker_length=0 and tag_value_length=0. 
+ *  
+ * @param self BamRecord object
+ * @param tag A pointer to a two-character tag (uint8_t[2]) or equivalent string.
+ * @param tag_marker The marker for the replacing tag. Pointer to array with 
+ *                   tag, value_type and optional array type + count.
+ * @param tag_marker_length 3 for singular values 8 for array types. 
+ * @param tag_value A pointer to the value of the new tag
+ * @param tag_value_length The length of the value.
+ * @return int 0 on success -1 on failure.
+ */
+static int _BamRecord_replace_tag(BamRecord *self, 
+                                  const uint8_t *tag,
+                                  const uint8_t *tag_marker,
+                                  size_t tag_marker_length,
+                                  uint8_t *tag_value,
+                                  size_t tag_value_length)
+{
+    const uint8_t *tags = (uint8_t *)PyBytes_AS_STRING(self->tags);
+    Py_ssize_t tags_length = PyBytes_GET_SIZE(self->tags);
+    const uint8_t *tags_end = tags + tags_length;
+    const uint8_t *old_tag_start = NULL;
+    if (find_tag(tags, tags_length, tag, &old_tag_start) != 0) {
+        return -1;
+    }
+    size_t before_tag_length = tags_length;
+    const uint8_t *after_tag_start = NULL;
+    size_t after_tag_length = 0;
+    if (old_tag_start != NULL) {
+        before_tag_length = old_tag_start - tags; 
+        after_tag_start = skip_tag(old_tag_start, tags_end);
+        if (after_tag_start == NULL) {
+            return -1;
+        }
+        after_tag_length = tags_end - after_tag_start;
+    } else if ((tag_marker_length == 0) && (tag_value_length == 0)) {
+        // No need to do anything
+        return 0;
+    }
+    Py_ssize_t new_size = before_tag_length + 
+                          after_tag_length + 
+                          tag_marker_length + 
+                          tag_value_length;
+    size_t old_block_size = self->block_size;
+    size_t new_block_size = old_block_size + new_size - tags_length;
+    if (new_block_size > UINT32_MAX) {
+        PyErr_SetString(PyExc_OverflowError, "Value too big to store in BamRecord");
+        return -1;
+    }
+    PyObject *tmp = PyBytes_FromStringAndSize(NULL, new_size);
+    if (tmp == NULL) {
+        PyErr_NoMemory();
+        return -1;
+    }
+    uint8_t *new_tags = (uint8_t *)PyBytes_AsString(tmp);
+    memcpy(new_tags, tags, before_tag_length);
+    new_tags += before_tag_length;
+    memcpy(new_tags, after_tag_start, after_tag_length);
+    new_tags += after_tag_length;
+    memcpy(new_tags, tag_marker, tag_marker_length);
+    new_tags += tag_marker_length;
+    memcpy(new_tags, tag_value, tag_value_length);
+    PyObject *old_tag_object = self->tags;
+    self->tags = tmp;
+    self->block_size = new_block_size;
+    Py_DECREF(old_tag_object);
+    return 0;
+}
+
+static int _BamRecord_set_array_tag(BamRecord *self,
+                                    const uint8_t *tag,
+                                    uint8_t array_type, 
+                                    PyObject *value)
+{
+    Py_buffer buffer;
+    uint8_t tp = array_type;
+    if (tp) {
+        if (PyObject_GetBuffer(value, &buffer, PyBUF_SIMPLE) != 0) {
+            return -1;
+        }
+    }
+    else {
+        if (PyObject_GetBuffer(value, &buffer, PyBUF_FORMAT) != 0) {
+            return -1;
+        }
+        tp = python_array_type_to_bam_type(buffer.format);
+        if (tp == 0) {  // Extremely unlikely. Unless python changes its formats.
+            goto error;
+        }
+    }
+    int itemsize = value_type_size(tp);
+    if (buffer.len % itemsize) {
+        PyErr_Format(
+            PyExc_ValueError, 
+            "Cannot set tag '%c%c' with type 'B%c' using %R. " 
+            "Buffer size not a multiple of %d.",
+            tag[0], tag[1], tp, value, itemsize
+        );
+        goto error;
+    }
+    size_t array_size = buffer.len / itemsize;
+    if (array_size > UINT32_MAX) {
+        PyErr_Format(
+            PyExc_OverflowError,
+            "Array size of %ld, is larger than %uld", array_size, UINT32_MAX
+        );
+        goto error;
+    }
+    uint8_t tag_marker[8] = {tag[0], tag[1], 'B', tp, 0, 0, 0, 0};
+    ((uint32_t *)tag_marker)[1] = (uint32_t)array_size;
+    int ret = _BamRecord_replace_tag(self, tag, tag_marker, 8, buffer.buf, buffer.len);
+    PyBuffer_Release(&buffer);
+    return ret;
+error:
+    PyBuffer_Release(&buffer);
+    return -1;
+}
+
+static int _BamRecord_set_tag(BamRecord *self, 
+                              const uint8_t *tag, 
+                              const uint8_t *value_type, 
+                              PyObject *value) 
+{
+    uint8_t tag_value_store[8];
+    void *tag_value = tag_value_store;
+    size_t tag_value_size = 0;
+    double dbl;
+
+    switch(value_type[0]) {
+        default:
+            PyErr_Format(PyExc_ValueError, "Unkown format: %c", value_type[0]);
+            return -1;
+        case 'B':
+            // Array tags are quite different and thus require quite a different
+            // approach than single value tags and strings.
+            return _BamRecord_set_array_tag(self, tag, value_type[1], value);
+        case 'A': 
+        case 'Z':
+            if (!PyUnicode_CheckExact(value)) {
+                PyErr_Format(
+                    PyExc_TypeError, 
+                    "Tag '%c%c' with value_type '%c' only accepts type str "
+                    "inputs, got %s", 
+                    tag[0], tag[1], value_type[0], Py_TYPE(value)->tp_name);
+                return -1;
+            }
+            if (!PyUnicode_IS_COMPACT_ASCII(value)) {
+                PyErr_Format(
+                    PyExc_ValueError, 
+                    "Tag '%c%c' with value_type '%c' only accepts valid ASCII "
+                    "characters.",
+                    tag[0], tag[1], value_type[0]);
+                return -1;
+            }
+            tag_value = PyUnicode_DATA(value);
+            if (value_type[0] == 'A') {
+                if (PyUnicode_GET_LENGTH(value) != 1) {
+                    PyErr_Format(
+                        PyExc_ValueError, 
+                        "Tag '%c%c' with value_type 'A', needs a string with "
+                        "exactly one character, got %d",
+                        tag[0], tag[1], PyUnicode_GET_LENGTH(value));
+                    return -1;
+                }
+                tag_value_size = 1;
+            } else {
+                // + 1 to the length, as CPython ensures a NULL byte at the end of 
+            // + 1 to the length, as CPython ensures a NULL byte at the end of 
+                // + 1 to the length, as CPython ensures a NULL byte at the end of 
+                // the string.
+                tag_value_size = PyUnicode_GET_LENGTH(value) + 1;
+            }
+            break;
+        case 'c':
+            tag_value_size = StorePyObjectValue_c(value, tag_value_store, tag);
+            break;
+        case 'C':
+            tag_value_size = StorePyObjectValue_C(value, tag_value_store, tag);
+            break;
+        case 's':
+            tag_value_size = StorePyObjectValue_s(value, tag_value_store, tag);
+            break;
+        case 'S':
+            tag_value_size = StorePyObjectValue_S(value, tag_value_store, tag);
+            break;
+        case 'i':
+            tag_value_size = StorePyObjectValue_i(value, tag_value_store, tag);
+            break;
+        case 'I':
+            tag_value_size = StorePyObjectValue_I(value, tag_value_store, tag);
+            break;
+        case 'f':
+            dbl = PyFloat_AsDouble(value);
+            if ((dbl == -1.0L) && PyErr_Occurred()) {
+                return -1;
+            }
+            ((float *)tag_value_store)[0] = (float)dbl;
+            tag_value_size = 4;
+            break;
+    }
+    if (tag_value_size == 0) {
+        return -1;
+    }
+    uint8_t tag_marker[3] = {tag[0], tag[1], value_type[0]};
+    return _BamRecord_replace_tag(self, tag, tag_marker, 3, tag_value, tag_value_size);
+}
+
+PyDoc_STRVAR(BamRecord_set_tag__doc__,
+"set_tag($self, tag, value, /, value_type=None)\n"
+"--\n"
+"\n"
+"Set the value of a tag.\n"
+"\n"
+"  tag\n"
+"    A two-letter ASCII string.\n"
+"  value\n"
+"    The value to store in the tag. Using None deletes the tag.\n"
+"  value_type\n"
+"    The value type of the tag. \n"
+"    By default this automatically determined by the tag if tag is in the \n" 
+"    SAMtags specification or else the type is determined by the value.\n"
+"\n");
+
+#define BAMRECORD_SET_TAG_METHODDEF    \
+    {"set_tag", (PyCFunction)(void(*)(void))BamRecord_set_tag, \
+     METH_VARARGS | METH_KEYWORDS, BamRecord_set_tag__doc__}
+
+static PyObject *BamRecord_set_tag(BamRecord *self, PyObject *args, PyObject *kwargs)
+{
+    PyObject *tag_obj = NULL;
+    uint8_t *tag = NULL; 
+    PyObject *value = NULL;
+    PyObject *value_type_obj = NULL;
+    const uint8_t *value_type = NULL;
+    static char *format = "O!O|O!:BamRecord.set_tag()";
+    static char *keywords[] = {"", "", "value_type", NULL};
+    if (!PyArg_ParseTupleAndKeywords(
+            args, kwargs, format, keywords, 
+            &PyUnicode_Type, &tag_obj, 
+            &value, 
+            &PyUnicode_Type, &value_type_obj)) { 
+                return NULL;
+    }
+    if (!PyUnicode_IS_COMPACT_ASCII(tag_obj)) {
+        PyErr_SetString(PyExc_ValueError, 
+                        "tag should only consist of ASCII characters");
+        return NULL;
+    }
+    if (PyUnicode_GET_LENGTH(tag_obj) != 2) {
+        PyErr_Format(
+            PyExc_ValueError, 
+            "tag must have a length of exactly 2, got %d",
+            PyUnicode_GET_LENGTH(tag_obj)
+        );
+        return NULL;
+    }
+    tag = PyUnicode_DATA(tag_obj);
+    if (value == Py_None) {
+        if (_BamRecord_replace_tag(self, tag, NULL, 0, NULL, 0) != 0) {
+            return NULL;
+        }
+        Py_RETURN_NONE;
+    }
+    if (value_type_obj) {
+        if (!PyUnicode_IS_COMPACT_ASCII(value_type_obj)) {
+            PyErr_SetString(
+                PyExc_ValueError, 
+                "value_type should only consist of ASCII characters");
+            return NULL;
+        }
+        Py_ssize_t value_type_length = PyUnicode_GET_LENGTH(value_type_obj);
+        value_type = PyUnicode_DATA(value_type_obj);
+        if ((value_type_length != 1) && 
+            !((value_type_length == 2) && (value_type[0] == 'B'))) {
+            PyErr_Format(
+                PyExc_ValueError, 
+                "value_type must have a length of 1 for non-B types and 2 for "
+                "B types, got length of %d for value_type %R",
+                value_type_length, value_type_obj);
+            return NULL;
+        }
+    }
+    else {
+        value_type = (uint8_t *)tag_to_value_type(tag);
+        if (value_type == NULL) {
+            value_type = (uint8_t *)PyObject_to_value_type(value);
+        }
+        if (value_type == NULL) {
+            return NULL;
+        }
+    }
+    if (_BamRecord_set_tag(self, tag, value_type, value) != 0) {
+        return NULL;
+    }
+    Py_RETURN_NONE;
+}
+
 
 static void
 BamRecord_to_ptr(BamRecord *self, char * dest) {
@@ -1035,6 +1726,14 @@ BamRecord_to_ptr(BamRecord *self, char * dest) {
     memcpy(dest + cursor, PyBytes_AS_STRING(self->tags), tag_size);
 }
 
+
+PyDoc_STRVAR(BamRecord_to_bytes__doc__,
+"Return the BAM record as a bytesobject that can be written into a file.");
+
+#define BAMRECORD_TO_BYTES_METHODDEF    \
+    {"to_bytes", (PyCFunction)(void(*)(void))BamRecord_to_bytes, METH_NOARGS, \
+     BamRecord_to_bytes__doc__}
+
 static PyObject *
 BamRecord_to_bytes(BamRecord *self, PyObject *NoArgs)
 {
@@ -1053,6 +1752,8 @@ static PyMethodDef BamRecord_methods[] = {
     BAMRECORD_TO_BYTES_METHODDEF,
     BAMRECORD_GET_SEQUENCE_METHODDEF,
     BAMRECORD_SET_SEQUENCE_METHODDEF,
+    BAMRECORD_GET_TAG_METHODDEF,
+    BAMRECORD_SET_TAG_METHODDEF,
     {NULL}
 };
 

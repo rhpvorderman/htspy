@@ -1,5 +1,6 @@
 import array
 import struct
+import sys
 
 from htspy._bam import BAM_CDIFF, BAM_CIGAR_SHIFT, BAM_CMATCH, \
     BAM_FUNMAP, BamRecord, Cigar, bam_iterator
@@ -132,3 +133,293 @@ def test_wrong_iupac_character_second_in_pair(empty_bam):
     with pytest.raises(ValueError) as error:
         empty_bam.set_sequence("AX")
     error.match("Not a IUPAC character: X")
+
+
+def float32(f: float):
+    """Represent float f with 32-bit precision."""
+    reduced, = struct.unpack("<f", struct.pack("<f", f))
+    return reduced
+
+
+TEST_TAGS = (
+        ("AB", b"ABAZ", "Z"),
+        ("CD", b"CDZmystring\x00", "mystring"),
+        ("EF", b"EFc" + struct.pack("<b", -20), -20),
+        ("GH", b"GHC" + struct.pack("<B", 170), 170),
+        ("IJ", b"IJs" + struct.pack("<h", -1024), -1024),
+        ("KL", b"KLS" + struct.pack("<H", 65000), 65000),
+        ("MN", b"MNi" + struct.pack("<i", -80_000), -80_000),
+        ("OP", b"OPI" + struct.pack("<I", 3_000_000_000), 3_000_000_000),
+        ("QR", b"QRf" + struct.pack("<f", 2.4),
+            struct.unpack("<f", struct.pack("<f", 2.4))[0]),
+        # B tag: first type letter, then count (of type uint32_t) then values.
+        ("ST", b"STBc" + struct.pack("<Ibbb", 3, -20, 10, -126), [-20, 10, -126]),
+        ("UV", b"UVBC" + struct.pack("<IBBB", 3, 65, 129, 203), [65, 129, 203]),
+        ("WX", b"WXBs" + struct.pack("<Ihhh", 3, -4000, 4000, 2000),
+         [-4000, 4000, 2000]),
+        ("YZ", b"YZBS" + struct.pack("<IHHH", 3, 4000, 40000, 65000),
+         [4000, 40000, 65000]),
+        ("AA", b"AABi" + struct.pack("<Iiii", 3, -80000, 80000, 2_000_000_000),
+         [-80000, 80000, 2_000_000_000]),
+        ("BB", b"BBBI" + struct.pack("<IIII", 3, 80000, 2_000_000_000, 4_000_000_000),
+         [80000, 2_000_000_000, 4_000_000_000]),
+        ("CC", b"CCBf" + struct.pack("<Ifff", 3, 1.1, 2.2, 3.3),
+         [float32(1.1), float32(2.2), float32(3.3)]),
+        ("DD", b"DDBd" + struct.pack("<Iddd", 3, 1.1, 2.2, 3.3), [1.1, 2.2, 3.3]),
+)
+
+
+@pytest.mark.parametrize(["tag", "raw_tag", "result"], TEST_TAGS)
+def test_get_tag(empty_bam, tag, raw_tag, result):
+    empty_bam._tags = raw_tag
+    ref_before = sys.getrefcount(raw_tag)
+    retrieved_tag = empty_bam.get_tag(tag)
+    if isinstance(retrieved_tag, memoryview):
+        retrieved_tag = retrieved_tag.tolist()
+    assert retrieved_tag == result
+    del result
+    assert sys.getrefcount(raw_tag) == ref_before
+
+
+def concatenate_tags():
+    for i, (tag, raw_tag, result) in enumerate(TEST_TAGS):
+        yield tag, TEST_TAGS[i - 1][1] + raw_tag, result
+
+
+@pytest.mark.parametrize(["tag", "raw_tag", "result"], concatenate_tags())
+def test_get_tag_correct_skip(empty_bam, tag, raw_tag, result):
+    empty_bam._tags = raw_tag
+    retrieved_tag = empty_bam.get_tag(tag)
+    if isinstance(retrieved_tag, memoryview):
+        retrieved_tag = retrieved_tag.tolist()
+    assert retrieved_tag == result
+
+
+def truncated_tags():
+    for tag, raw_tag, result in TEST_TAGS:
+        # Checks tag_ptr to pyobject code
+        for i in range(1, len(raw_tag)):
+            yield tag, raw_tag[:-i]
+        # checks skip tag code
+        for i in range(1, len(raw_tag)):
+            yield "XX", raw_tag[:-i]
+
+
+@pytest.mark.parametrize(["tag", "trunc_tag"], truncated_tags())
+def test_trucated_tag_error(empty_bam, tag, trunc_tag):
+    empty_bam._tags = trunc_tag
+    with pytest.raises(ValueError) as error:
+        empty_bam.get_tag(tag)
+    error.match("truncated tag")
+
+
+def test_get_tag_not_found():
+    bam = BamRecord()
+    with pytest.raises(KeyError) as error:
+        bam.get_tag("XX")
+    error.match("not found")
+    error.match("XX")
+
+
+@pytest.mark.parametrize(["tag", "raw_tag", "value"], TEST_TAGS)
+def test_set_tag(empty_bam, tag, raw_tag, value):
+    value_type = raw_tag[2:3].decode("ASCII")
+    if value_type == "B":
+        value_type = raw_tag[2:4].decode("ASCII")
+        value = raw_tag[8:]
+    empty_bam.set_tag(tag, value, value_type)
+    assert empty_bam._tags == raw_tag
+
+
+ARRAY_VALUES = [(array.array(python_type, [1, 2, 3]), bam_type)
+                for python_type, bam_type in
+                zip("bBhHiIf", "cCsSiIf")]
+
+
+@pytest.mark.parametrize("value", ARRAY_VALUES)
+def test_set_tag_array_format(value: array.array):
+    value = value[0]
+    empty_bam = BamRecord()
+    empty_bam.set_tag("XX", value)
+    # Mypy gets confused by generic get_tag return types
+    arr: memoryview = empty_bam.get_tag("XX")  # type: ignore
+    assert list(arr) == list(value)
+    assert arr.format == value.typecode
+
+
+@pytest.mark.parametrize("value", ARRAY_VALUES[2:])
+def test_set_tag_itemsize_error(value):
+    value, typecode = value
+    b = value.tobytes()[:-1]
+    empty_bam = BamRecord()
+    with pytest.raises(ValueError) as error:
+        empty_bam.set_tag("XX", b, "B" + typecode)
+    error.match("uffer size not a multiple of")
+
+
+def test_set_tag_non_ascii_error():
+    bam = BamRecord()
+    with pytest.raises(ValueError) as error:
+        bam.set_tag("Xë", "somestring")
+    error.match("ASCII")
+
+
+def test_set_tag_too_long_tag():
+    bam = BamRecord()
+    with pytest.raises(ValueError) as error:
+        bam.set_tag("AVA", "somestring")
+    error.match("2")
+    error.match("length")
+
+
+def test_set_tag_value_type_non_ascii():
+    bam = BamRecord()
+    with pytest.raises(ValueError) as error:
+        bam.set_tag("AV", "somestring", "Č")
+    error.match("ASCII")
+
+
+def test_set_tag_value_type_too_long():
+    bam = BamRecord()
+    with pytest.raises(ValueError) as error:
+        bam.set_tag("AV", "somestring", "ZZ")
+    error.match("length")
+
+
+@pytest.mark.parametrize(
+    "value_type",
+    ["c", "C", "s", "S", "i", "I", "f", "Z", "A",
+     "Bc", "BC", "Bs", "BS", "Bi", "BI", "Bf"]
+)
+def test_set_tag_wrong_types(value_type):
+    # Strings do not support the buffer interface and are therefore
+    # illegal for B type tags.
+    value = "a" if value_type.startswith("B") else b"a"
+    with pytest.raises(TypeError):
+        BamRecord().set_tag("XX", value, value_type)
+
+
+@pytest.mark.parametrize(["value", "value_type"], [
+    ("String", "Z"),
+    (1, "i"),
+    (3.4, "f"),
+    (array.array("b", [1]), "Bc"),
+    (array.array("B", [1]), "BC"),
+    (array.array("h", [1]), "Bs"),
+    (array.array("H", [1]), "BS"),
+    (array.array("i", [1]), "Bi"),
+    (array.array("I", [1]), "BI"),
+    (array.array("f", [1]), "Bf"),
+    (b"1", "BC"),
+])
+def test_set_tag_autodetect_from_type(value, value_type):
+    bam = BamRecord()
+    bam.set_tag("XX", value)
+    value_type_in_tag = bam._tags[2:3].decode("ASCII")
+    if value_type_in_tag == "B":
+        value_type_in_tag += bam._tags[3:4].decode("ASCII")
+    assert value_type_in_tag == value_type
+
+
+def test_set_tag_correctly_replaces():
+    bam = BamRecord()
+    # Test several tag replacements to make sure all code is run.
+    bam.set_tag("XX", 1, 'C')  # Empty tag object gets filled with first value
+    assert bam.get_tag("XX") == 1
+    bam.set_tag("XY", 2, 'C')  # New tag gets added to existing tag object
+    assert bam.get_tag("XY") == 2
+    bam.set_tag("XZ", 3, 'C')  # Add another tag to have begin, middle and end tags.
+    bam.set_tag("XY", 4, 'C')  # Replace middle tag in raw tag bytes object
+    assert bam.get_tag("XY") == 4
+    bam.set_tag("XX", 5, 'C')  # Replace first tag
+    assert bam.get_tag("XX") == 5
+    bam.set_tag("XX", 6, 'C')  # Replace last tag
+    assert bam.get_tag("XX") == 6
+
+
+@pytest.mark.parametrize(
+    ["value_type", "lower", "upper"], [
+        ("c", -(2 ** 7), 2 ** 7 - 1),
+        ("C", 0, 2 ** 8 - 1),
+        ("s", -(2 ** 15), 2 ** 15 - 1),
+        ("S", 0, 2 ** 16 - 1),
+        ("i", -(2 ** 31), 2 ** 31 - 1),
+        ("I", 0, 2 ** 32 - 1)
+    ]
+)
+def test_tag_value_boundaries(value_type, lower, upper):
+    bam = BamRecord()
+    # First assert there are no errors
+    bam.set_tag("XX", lower, value_type)
+    bam.set_tag("XY", upper, value_type)
+    with pytest.raises(ValueError) as lower_error:
+        bam.set_tag("XZ", lower - 1, value_type)
+    lower_error.match(str(lower))
+    with pytest.raises(ValueError) as upper_error:
+        bam.set_tag("XZ", upper + 1, value_type)
+    upper_error.match(str(upper))
+
+
+@pytest.mark.parametrize("value_type", ["A", "Z"])
+def test_set_tag_non_ascii(value_type):
+    bam = BamRecord()
+    with pytest.raises(ValueError) as error:
+        bam.set_tag("XX", "Ä", value_type)
+    assert error.match("ASCII")
+
+
+@pytest.mark.parametrize("value", ["", "12"])
+def test_set_tag_a_wrong_size(value):
+    bam = BamRecord()
+    with pytest.raises(ValueError) as error:
+        bam.set_tag("XX", value, "A")
+    error.match("exactly one")
+
+
+def test_set_tag_array_too_large():
+    bam = BamRecord()
+    try:
+        too_large_array = bytes(2 ** 32)
+    except MemoryError:  # Too little memory on CI node
+        return
+    with pytest.raises(OverflowError) as error:
+        bam.set_tag("XX", too_large_array)
+    error.match(str(2 ** 32 - 1))
+
+
+def test_set_tag_block_size_overflow():
+    bam = BamRecord()
+    # This array is equal to the maximum size of a bamrecord in memory.
+    # Therefore it will not fit even though it fits in an array tag type.
+    try:
+        block_size_array = bytes(2 ** 32 - 1)
+    except MemoryError:  # Too little memory on CI node
+        return
+    with pytest.raises(OverflowError) as error:
+        bam.set_tag("XX", block_size_array)
+    error.match("BamRecord")
+    error.match("Value too big")
+
+
+def test_set_tag_delete():
+    bam = BamRecord()
+    bam.set_tag("XX", "Mytag")
+    bam.set_tag("XX", None)
+    with pytest.raises(KeyError):
+        bam.get_tag("XX")
+
+
+def test_deleting_non_existing_tag_does_nothing():
+    bam = BamRecord()
+    bam.set_tag("XX", "some value")
+    old_tags = bam._tags
+    bam.set_tag("RG", None)
+    assert bam._tags is old_tags
+
+
+def test_set_array_tag_buffer_released():
+    my_array = bytearray(1000)
+    my_array_refs = sys.getrefcount(my_array)
+    bam = BamRecord()
+    bam.set_tag("XX", my_array)
+    assert sys.getrefcount(my_array) == my_array_refs
