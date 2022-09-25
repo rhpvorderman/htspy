@@ -304,3 +304,19 @@ def test_set_tag_autodetect_from_type(value, value_type):
     if value_type_in_tag == "B":
         value_type_in_tag += bam._tags[3:4].decode("ASCII")
     assert value_type_in_tag == value_type
+
+
+def test_set_tag_correctly_replaces():
+    bam=BamRecord()
+    # Test several tag replacements to make sure all code is run.
+    bam.set_tag("XX", 1, 'C')  # Empty tag object gets filled with first value
+    assert bam.get_tag("XX") == 1
+    bam.set_tag("XY", 2, 'C')  # New tag gets added to existing tag object
+    assert bam.get_tag("XY") == 2
+    bam.set_tag("XZ", 3, 'C')  # Add another tag to have begin, middle and end tags.
+    bam.set_tag("XY", 4, 'C')  # Replace middle tag in raw tag bytes object
+    assert bam.get_tag("XY") == 4
+    bam.set_tag("XX", 5, 'C')  # Replace first tag
+    assert bam.get_tag("XX") == 5
+    bam.set_tag("XX", 6, 'C')  # Replace last tag
+    assert bam.get_tag("XX") == 6
