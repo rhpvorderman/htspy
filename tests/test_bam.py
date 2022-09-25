@@ -283,3 +283,24 @@ def test_set_tag_wrong_types(value_type):
     value = "a" if value_type.startswith("B") else b"a"
     with pytest.raises(TypeError):
         BamRecord().set_tag("XX", value, value_type)
+
+
+@pytest.mark.parametrize(["value", "value_type"], [
+    ("String", "Z"),
+    (1, "i"),
+    (3.4, "f"),
+    (array.array("b", [1]), "Bc"),
+    (array.array("B", [1]), "BC"),
+    (array.array("h", [1]), "Bs"),
+    (array.array("H", [1]), "BS"),
+    (array.array("i", [1]), "Bi"),
+    (array.array("I", [1]), "BI"),
+    (array.array("f", [1]), "Bf"),
+])
+def test_set_tag_autodetect_from_type(value, value_type):
+    bam = BamRecord()
+    bam.set_tag("XX", value)
+    value_type_in_tag = bam._tags[2:3].decode("ASCII")
+    if value_type_in_tag == "B":
+        value_type_in_tag += bam._tags[3:4].decode("ASCII")
+    assert value_type_in_tag == value_type

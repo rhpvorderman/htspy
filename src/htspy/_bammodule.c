@@ -1382,7 +1382,7 @@ static const char *PyObject_to_value_type(PyObject *value) {
         return "Z";
     }
     if (PyLong_CheckExact(value)) {
-        return "I";
+        return "i";
     }
     if (PyFloat_CheckExact(value)) {
         return "f";
