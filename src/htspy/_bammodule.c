@@ -1063,8 +1063,8 @@ skip_tag(const uint8_t *start, const uint8_t *end) {
     if (start >= end) {
         return end;
     }
-    if ((end - start) <= 4) {  // end_ptr is NULL byte
-        if ((end - start) <= 2) {
+    if ((end - start) < 4) {  // end_ptr is NULL byte
+        if ((end - start) < 2) {
             PyErr_SetString(PyExc_ValueError, "truncated tag");
         } else {
             PyErr_Format(PyExc_ValueError, "truncated tag %c%c", 
