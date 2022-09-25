@@ -1434,6 +1434,9 @@ static int _BamRecord_replace_tag(BamRecord *self,
             return -1;
         }
         after_tag_length = tags_end - after_tag_start;
+    } else if ((tag_marker_length == 0) && (tag_value_length == 0)) {
+        // No need to do anything
+        return 0;
     }
     Py_ssize_t new_size = before_tag_length + 
                           after_tag_length + 

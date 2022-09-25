@@ -177,7 +177,7 @@ def test_get_tag(empty_bam, tag, raw_tag, result):
     if isinstance(retrieved_tag, memoryview):
         retrieved_tag = retrieved_tag.tolist()
     assert retrieved_tag == result
-    del(result)
+    del result
     assert sys.getrefcount(raw_tag) == ref_before
 
 
@@ -401,6 +401,14 @@ def test_set_tag_delete():
     bam.set_tag("XX", None)
     with pytest.raises(KeyError):
         bam.get_tag("XX")
+
+
+def test_deleting_non_existing_tag_does_nothing():
+    bam = BamRecord()
+    bam.set_tag("XX", "some value")
+    old_tags = bam._tags
+    bam.set_tag("RG", None)
+    assert bam._tags is old_tags
 
 
 def test_set_array_tag_buffer_released():
