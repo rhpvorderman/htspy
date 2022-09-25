@@ -401,3 +401,11 @@ def test_set_tag_delete():
     bam.set_tag("XX", None)
     with pytest.raises(KeyError):
         bam.get_tag("XX")
+
+
+def test_set_array_tag_buffer_released():
+    my_array = bytearray(1000)
+    my_array_refs = sys.getrefcount(my_array)
+    bam = BamRecord()
+    bam.set_tag("XX", my_array)
+    assert sys.getrefcount(my_array) == my_array_refs

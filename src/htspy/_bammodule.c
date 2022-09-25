@@ -1506,7 +1506,9 @@ static int _BamRecord_set_array_tag(BamRecord *self,
     }
     uint8_t tag_marker[8] = {tag[0], tag[1], 'B', tp, 0, 0, 0, 0};
     ((uint32_t *)tag_marker)[1] = (uint32_t)array_size;
-    return _BamRecord_replace_tag(self, tag, tag_marker, 8, buffer.buf, buffer.len);
+    int ret = _BamRecord_replace_tag(self, tag, tag_marker, 8, buffer.buf, buffer.len);
+    PyBuffer_Release(&buffer);
+    return ret;
 error:
     PyBuffer_Release(&buffer);
     return -1;
