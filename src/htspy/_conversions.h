@@ -91,8 +91,8 @@ static int StorePyObjectValue_c(PyObject *value, void *value_store, const uint8_
         PyErr_Format(
             PyExc_ValueError,
             "Tag '%c%c' with value_type 'c' should have a value "
-            "between %ld and %ld.",
-            tag[0], tag[1], INT8_MIN, INT8_MAX);
+            "between %lld and %lld.",
+            tag[0], tag[1], (long long)INT8_MIN, (long long)INT8_MAX);
         return 0;
     }
     ((int8_t *)value_store)[0] = (int8_t)v;
@@ -109,8 +109,8 @@ static int StorePyObjectValue_C(PyObject *value, void *value_store, const uint8_
         PyErr_Format(
             PyExc_ValueError,
             "Tag '%c%c' with value_type 'C' should have a value "
-            "between %ld and %ld.",
-            tag[0], tag[1], 0, UINT8_MAX);
+            "between %lld and %lld.",
+            tag[0], tag[1], (long long)0, (long long)UINT8_MAX);
         return 0;
     }
     ((uint8_t *)value_store)[0] = (uint8_t)v;
@@ -127,8 +127,8 @@ static int StorePyObjectValue_s(PyObject *value, void *value_store, const uint8_
         PyErr_Format(
             PyExc_ValueError,
             "Tag '%c%c' with value_type 's' should have a value "
-            "between %ld and %ld.",
-            tag[0], tag[1], INT16_MIN, INT16_MAX);
+            "between %lld and %lld.",
+            tag[0], tag[1], (long long)INT16_MIN, (long long)INT16_MAX);
         return 0;
     }
     ((int16_t *)value_store)[0] = (int16_t)v;
@@ -145,8 +145,8 @@ static int StorePyObjectValue_S(PyObject *value, void *value_store, const uint8_
         PyErr_Format(
             PyExc_ValueError,
             "Tag '%c%c' with value_type 'S' should have a value "
-            "between %ld and %ld.",
-            tag[0], tag[1], 0, UINT16_MAX);
+            "between %lld and %lld.",
+            tag[0], tag[1], (long long)0, (long long)UINT16_MAX);
         return 0;
     }
     ((uint16_t *)value_store)[0] = (uint16_t)v;
@@ -163,8 +163,8 @@ static int StorePyObjectValue_i(PyObject *value, void *value_store, const uint8_
         PyErr_Format(
             PyExc_ValueError,
             "Tag '%c%c' with value_type 'i' should have a value "
-            "between %ld and %ld.",
-            tag[0], tag[1], INT32_MIN, INT32_MAX);
+            "between %lld and %lld.",
+            tag[0], tag[1], (long long)INT32_MIN, (long long)INT32_MAX);
         return 0;
     }
     ((int32_t *)value_store)[0] = (int32_t)v;
@@ -181,8 +181,8 @@ static int StorePyObjectValue_I(PyObject *value, void *value_store, const uint8_
         PyErr_Format(
             PyExc_ValueError,
             "Tag '%c%c' with value_type 'I' should have a value "
-            "between %ld and %ld.",
-            tag[0], tag[1], 0, UINT32_MAX);
+            "between %lld and %lld.",
+            tag[0], tag[1], (long long)0, (long long)UINT32_MAX);
         return 0;
     }
     ((uint32_t *)value_store)[0] = (uint32_t)v;
