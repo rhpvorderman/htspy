@@ -1453,7 +1453,7 @@ static int _BamRecord_replace_tag(BamRecord *self,
         PyErr_NoMemory();
         return -1;
     }
-    void *new_tags = PyBytes_AsString(tmp);
+    uint8_t *new_tags = (uint8_t *)PyBytes_AsString(tmp);
     memcpy(new_tags, tags, before_tag_length);
     new_tags += before_tag_length;
     memcpy(new_tags, after_tag_start, after_tag_length);
