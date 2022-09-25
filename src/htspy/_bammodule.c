@@ -1260,7 +1260,7 @@ PyDoc_STRVAR(BamRecord_get_tag__doc__,
 "get_tag($self, tag, /)\n"
 "--\n"
 "\n"
-"Returns the value of a tag. Raises a LookupError if not found.\n"
+"Returns the value of a tag. Raises a KeyError if not found.\n"
 "\n"
 "  tag\n"
 "    A two-letter ASCII string.\n"
@@ -1295,7 +1295,7 @@ BamRecord_get_tag(BamRecord *self, PyObject *tag) {
         return NULL;
     }
     if (found_tag == NULL) {
-        PyErr_Format(PyExc_LookupError, "Tag not present: %S", tag);
+        PyErr_Format(PyExc_KeyError, "Tag not found: %S", tag);
         return NULL;
     }
     return tag_ptr_to_pyobject(found_tag, tags + tags_length, self->tags);
@@ -1651,6 +1651,12 @@ static PyObject *BamRecord_set_tag(BamRecord *self, PyObject *args, PyObject *kw
         return NULL;
     }
     tag = PyUnicode_DATA(tag_obj);
+    if (value == Py_None) {
+        if (_BamRecord_replace_tag(self, tag, NULL, 0, NULL, 0) != 0) {
+            return NULL;
+        }
+        Py_RETURN_NONE;
+    }
     if (value_type_obj) {
         if (!PyUnicode_IS_COMPACT_ASCII(value_type_obj)) {
             PyErr_SetString(

@@ -208,6 +208,14 @@ def test_trucated_tag_error(empty_bam, tag, trunc_tag):
     error.match("truncated tag")
 
 
+def test_get_tag_not_found():
+    bam = BamRecord()
+    with pytest.raises(KeyError) as error:
+        bam.get_tag("XX")
+    error.match("not found")
+    error.match("XX")
+
+
 @pytest.mark.parametrize(["tag", "raw_tag", "value"], TEST_TAGS)
 def test_set_tag(empty_bam, tag, raw_tag, value):
     value_type = raw_tag[2:3].decode("ASCII")
@@ -379,3 +387,11 @@ def test_set_tag_block_size_overflow():
         bam.set_tag("XX", block_size_array)
     error.match("BamRecord")
     error.match("Value too big")
+
+
+def test_set_tag_delete():
+    bam = BamRecord()
+    bam.set_tag("XX", "Mytag")
+    bam.set_tag("XX", None)
+    with pytest.raises(KeyError):
+        bam.get_tag("XX")
