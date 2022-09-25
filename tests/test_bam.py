@@ -227,8 +227,10 @@ def test_set_tag(empty_bam, tag, raw_tag, value):
     if value_type == "B":
         value_type = raw_tag[2:4].decode("ASCII")
         value = raw_tag[8:]
+    old_block_size = empty_bam._block_size
     empty_bam.set_tag(tag, value, value_type)
     assert empty_bam._tags == raw_tag
+    assert empty_bam._block_size == old_block_size + len(raw_tag)
 
 
 ARRAY_VALUES = [(array.array(python_type, [1, 2, 3]), bam_type)
