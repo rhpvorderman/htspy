@@ -1657,14 +1657,16 @@ static PyObject *BamRecord_set_tag(BamRecord *self, PyObject *args, PyObject *kw
             return NULL;
         }
         Py_ssize_t value_type_length = PyUnicode_GET_LENGTH(value_type_obj);
-        if (value_type_length != 1 && value_type_length != 2) {
+        value_type = PyUnicode_DATA(value_type_obj);
+        if ((value_type_length != 1) && 
+            !((value_type_length == 2) && (value_type[0] == 'B'))) {
             PyErr_Format(
                 PyExc_ValueError, 
-                "value_type must have a length of 1 or 2, got %d",
-                value_type_length);
+                "value_type must have a length of 1 for non-B types and 2 for "
+                "B types, got length of %d for value_type %R",
+                value_type_length, value_type_obj);
             return NULL;
         }
-        value_type = PyUnicode_DATA(value_type_obj);
     }
     else {
         value_type = (uint8_t *)tag_to_value_type(tag);

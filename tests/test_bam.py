@@ -268,7 +268,7 @@ def test_set_tag_value_type_non_ascii():
 def test_set_tag_value_type_too_long():
     bam = BamRecord()
     with pytest.raises(ValueError) as error:
-        bam.set_tag("AV", "somestring", "ZZZ")
+        bam.set_tag("AV", "somestring", "ZZ")
     error.match("length")
 
 
