@@ -1186,21 +1186,21 @@ tag_ptr_to_pyobject(const uint8_t *start, const uint8_t *end, PyObject *tag_obje
             return PyUnicode_DecodeASCII((char *)value_start, 
                                          value_end - value_start, NULL);
         case 'c':
-            return PyLong_FromLong(*(int8_t *)value_start);
+            return PyLong_FromLongLong(*(int8_t *)value_start);
         case 'C':
-            return PyLong_FromLong(*(uint8_t *)value_start);
+            return PyLong_FromLongLong(*(uint8_t *)value_start);
         case 's':
             if (max_length < 2) break;
-            return PyLong_FromLong(*(int16_t *)value_start);
+            return PyLong_FromLongLong(*(int16_t *)value_start);
         case 'S':
             if (max_length < 2) break;
-            return PyLong_FromLong(*(uint16_t *)value_start);
+            return PyLong_FromLongLong(*(uint16_t *)value_start);
         case 'i':
             if (max_length < 4) break;
-            return PyLong_FromLong(*(int32_t *)value_start);
+            return PyLong_FromLongLong(*(int32_t *)value_start);
         case 'I':
             if (max_length < 4) break;
-            return PyLong_FromLong(*(uint32_t *)value_start);
+            return PyLong_FromLongLong(*(uint32_t *)value_start);
         case 'f':
             if (max_length < 4) break;
             return PyFloat_FromDouble(*(float *)value_start);
