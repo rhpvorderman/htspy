@@ -52,7 +52,7 @@ class BamRecord:
     _next_pos: int
     _tlen: int
     _read_name: bytes
-    _cigar: bytes
+    _cigar: Cigar
     _seq: bytes
     _qual: bytes
     _tags: bytes
@@ -66,7 +66,6 @@ class BamRecord:
     read_name: str
     qualities: bytes
     cigar: Cigar
-    tags: bytes
 
     def get_sequence(self) -> str: ...
 
