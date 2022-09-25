@@ -1260,6 +1260,22 @@ tag_ptr_to_pyobject(const uint8_t *start, const uint8_t *end, PyObject *tag_obje
     return NULL; 
 }
 
+static inline PyObject *
+_BamRecord_get_tag(BamRecord *self, uint8_t *tag) 
+{
+    uint8_t *tags = (uint8_t *)PyBytes_AS_STRING(self->tags);
+    Py_ssize_t tags_length = PyBytes_GET_SIZE(self->tags);
+    const uint8_t *found_tag = NULL;
+    int ret = find_tag(tags, tags_length, tag, &found_tag);
+    if (ret != 0) {
+        return NULL;
+    }
+    if (found_tag == NULL) {
+        PyErr_Format(PyExc_KeyError, "Tag not found: %c%c", tag[0], tag[1]);
+        return NULL;
+    }
+    return tag_ptr_to_pyobject(found_tag, tags + tags_length, self->tags);
+}
 PyDoc_STRVAR(BamRecord_get_tag__doc__,
 "get_tag($self, tag, /)\n"
 "--\n"
@@ -1291,18 +1307,7 @@ BamRecord_get_tag(BamRecord *self, PyObject *tag) {
         return NULL;
     }
     uint8_t *search_tag = (uint8_t *)PyUnicode_DATA(tag);
-    uint8_t *tags = (uint8_t *)PyBytes_AS_STRING(self->tags);
-    Py_ssize_t tags_length = PyBytes_GET_SIZE(self->tags);
-    const uint8_t *found_tag = NULL;
-    int ret = find_tag(tags, tags_length, search_tag, &found_tag);
-    if (ret != 0) {
-        return NULL;
-    }
-    if (found_tag == NULL) {
-        PyErr_Format(PyExc_KeyError, "Tag not found: %S", tag);
-        return NULL;
-    }
-    return tag_ptr_to_pyobject(found_tag, tags + tags_length, self->tags);
+    return _BamRecord_get_tag(self, search_tag);
 }
 
 static const char *tag_to_value_type(const uint8_t *tag) {
