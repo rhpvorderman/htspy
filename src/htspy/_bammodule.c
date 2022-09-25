@@ -760,9 +760,13 @@ BamRecord_set_cigar(BamRecord * self, BamCigar * new_cigar, void * closure) {
         return -1;
     }
     PyObject * tmp = self->bamcigar;
+    uint16_t old_cigar_op = self->n_cigar_op;
+    uint16_t new_cigar_op = Py_SIZE(new_cigar);
+    ssize_t new_block_size = self->block_size + ((new_cigar_op  - old_cigar_op) * 4);
     Py_INCREF(new_cigar);
     self->bamcigar = (PyObject *)new_cigar;
-    self->n_cigar_op = Py_SIZE(new_cigar);
+    self->n_cigar_op = new_cigar_op;
+    self->block_size = new_block_size;
     Py_DECREF(tmp);
     return 0;
 }
