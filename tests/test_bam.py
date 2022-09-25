@@ -320,3 +320,26 @@ def test_set_tag_correctly_replaces():
     assert bam.get_tag("XX") == 5
     bam.set_tag("XX", 6, 'C')  # Replace last tag
     assert bam.get_tag("XX") == 6
+
+
+@pytest.mark.parametrize(
+    ["value_type", "lower", "upper"], [
+        ("c", -(2 ** 7), 2 ** 7 -1),
+        ("C", 0, 2 ** 8 - 1),
+        ("s", -(2 ** 15), 2 ** 15 -1),
+        ("S", 0, 2 ** 16 - 1),
+        ("i", -(2 ** 31), 2 ** 31 - 1),
+        ("I", 0, 2 ** 32 - 1)
+    ]
+)
+def test_tag_value_boundaries(value_type, lower, upper):
+    bam = BamRecord()
+    # First assert there are no errors
+    bam.set_tag("XX", lower, value_type)
+    bam.set_tag("XY", upper, value_type)
+    with pytest.raises(ValueError) as lower_error:
+        bam.set_tag("XZ", lower -1, value_type)
+    lower_error.match(str(lower))
+    with pytest.raises(ValueError) as upper_error:
+        bam.set_tag("XZ", upper + 1, value_type)
+    upper_error.match(str(upper))
