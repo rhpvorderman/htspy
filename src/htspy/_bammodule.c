@@ -61,7 +61,7 @@ static PyObject *
 BamCigar_FromPointerAndSize(uint32_t * cigar_ptr, Py_ssize_t n_cigar_op) {
     BamCigar * obj;
     size_t size = n_cigar_op * sizeof(uint32_t);
-    if (size > PY_SSIZE_T_MAX) {
+    if (size > UINT32_MAX) {
         PyErr_SetString(PyExc_OverflowError, "Cigar array too large.");
         return NULL;
     }
@@ -728,20 +728,38 @@ BamRecord_set_tags(BamRecord * self, PyObject * new_tags, void* closure)
     return 0;
 }
 
+static inline PyObject *_BamRecord_get_tag(BamRecord *self, uint8_t *tag);
+static int _BamRecord_replace_tag(BamRecord *self, 
+                                  const uint8_t *tag,
+                                  const uint8_t *tag_marker,
+                                  size_t tag_marker_length,
+                                  uint8_t *tag_value,
+                                  size_t tag_value_length);
+
 PyDoc_STRVAR(BamRecord_cigar_doc, 
 "A BamCigar object representing the CIGAR information.");
 
 static PyObject *
 BamRecord_get_cigar(BamRecord * self, void * closure) {
+    PyObject *return_val = NULL;
     if (self->n_cigar_op == 2) {
         // Initiate CG tag check
-        uint32_t * cigar = BamCigar_GET_CIGAR(self->bamcigar);
+        uint32_t *cigar = BamCigar_GET_CIGAR(self->bamcigar);
         if ((bam_cigar_op(cigar[0]) == BAM_CSOFT_CLIP) && 
             (bam_cigar_oplen(cigar[0]) == self->l_seq)) {
-                PyErr_SetString(PyExc_NotImplementedError, 
-                    "Support for cigars longer than 65536 has not yet been implemented.");
-                return NULL;
-            }
+                uint8_t *tags = PyBytes_AS_STRING(self->tags);
+                Py_ssize_t tags_length = PyBytes_GET_SIZE(self->tags);
+                uint8_t *cg_tag;
+                if (find_tag(tags, tags_length, (uint8_t *)"CG", 
+                                           &cg_tag) != 0) {
+                    return NULL;
+                }
+                if (cg_tag != NULL) {
+                    uint32_t n_cigar_op = *(uint32_t *)(cg_tag + 4);
+                    return BamCigar_FromPointerAndSize((uint32_t *)(cg_tag + 8), 
+                                                       n_cigar_op);
+                }
+        }
     }
     Py_INCREF(self->bamcigar);
     return (PyObject *)self->bamcigar;
@@ -750,14 +768,22 @@ BamRecord_get_cigar(BamRecord * self, void * closure) {
 static int 
 BamRecord_set_cigar(BamRecord * self, BamCigar * new_cigar, void * closure) {
     if (Py_TYPE(new_cigar) != &BamCigar_Type) {
-        PyErr_Format(PyExc_TypeError, "cigar must be of BamCigar type, got %s.",
+        PyErr_Format(PyExc_TypeError, "cigar must be of Cigar type, got %s.",
             Py_TYPE(new_cigar)->tp_name);
         return -1; 
     }
-    if (Py_SIZE(new_cigar) > 65536) {
-        PyErr_SetString(PyExc_NotImplementedError, 
-            "Support for cigars longer than 65536 has not yet been implemented.");
-        return -1;
+    Py_ssize_t n_cigar_op = Py_SIZE(new_cigar);
+    if (n_cigar_op > 65536) {
+        uint8_t tag_marker[8] = {'C', 'G', 'B', 'I', 0, 0, 0, 0};
+        // BamCigar cannot be created larger than UINT32_MAX, so no need for checks.
+        ((uint32_t *)tag_marker)[1] = n_cigar_op;  
+        if (_BamRecord_replace_tag(self, (uint8_t *)"CG", tag_marker, 8, 
+                                   BamCigar_GET_CIGAR(new_cigar), n_cigar_op) != 0) {
+            return -1;
+        }
+        // Add code here to create a new mock bam_cigar to signify the new CG tag.
+    } else {
+        // Add code here to remove "CG" tag.
     }
     PyObject * tmp = self->bamcigar;
     uint16_t old_cigar_op = self->n_cigar_op;
