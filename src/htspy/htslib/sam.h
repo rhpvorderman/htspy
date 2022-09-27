@@ -92,3 +92,25 @@
 #define BAM_FDUP        1024
 /*! @abstract supplementary alignment */
 #define BAM_FSUPPLEMENTARY 2048
+
+// Cigar length operations
+typedef int64_t hts_pos_t;
+hts_pos_t bam_cigar2qlen(int n_cigar, const uint32_t *cigar)
+{
+    int k;
+    hts_pos_t l;
+    for (k = l = 0; k < n_cigar; ++k)
+        if (bam_cigar_type(bam_cigar_op(cigar[k]))&1)
+            l += bam_cigar_oplen(cigar[k]);
+    return l;
+}
+
+hts_pos_t bam_cigar2rlen(int n_cigar, const uint32_t *cigar)
+{
+    int k;
+    hts_pos_t l;
+    for (k = l = 0; k < n_cigar; ++k)
+        if (bam_cigar_type(bam_cigar_op(cigar[k]))&2)
+            l += bam_cigar_oplen(cigar[k]);
+    return l;
+}
