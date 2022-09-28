@@ -732,37 +732,27 @@ PyDoc_STRVAR(BamRecord_cigar_doc,
 "A BamCigar object representing the CIGAR information.");
 
 static PyObject *
-BamRecord_get_cigar(BamRecord * self, void * closure) {
-    if (self->n_cigar_op == 2) {
-        // Initiate CG tag check
-        uint32_t * cigar = BamCigar_GET_CIGAR(self->bamcigar);
-        if ((bam_cigar_op(cigar[0]) == BAM_CSOFT_CLIP) && 
-            (bam_cigar_oplen(cigar[0]) == self->l_seq)) {
-                PyErr_SetString(PyExc_NotImplementedError, 
-                    "Support for cigars longer than 65536 has not yet been implemented.");
-                return NULL;
-            }
-    }
+BamRecord_get_cigar(BamRecord *self, void * closure) {
     Py_INCREF(self->bamcigar);
     return (PyObject *)self->bamcigar;
 }
 
 static int 
-BamRecord_set_cigar(BamRecord * self, BamCigar * new_cigar, void * closure) {
+BamRecord_set_cigar(BamRecord *self, BamCigar *new_cigar, void *closure) {
     if (Py_TYPE(new_cigar) != &BamCigar_Type) {
         PyErr_Format(PyExc_TypeError, "cigar must be of BamCigar type, got %s.",
             Py_TYPE(new_cigar)->tp_name);
         return -1; 
     }
+    Py_ssize_t n_cigar_op = Py_SIZE(new_cigar);
     if (Py_SIZE(new_cigar) > 65536) {
-        PyErr_SetString(PyExc_NotImplementedError, 
-            "Support for cigars longer than 65536 has not yet been implemented.");
-        return -1;
+        self->n_cigar_op = 65536;
+    } else {
+        self->n_cigar_op = n_cigar_op;
     }
     PyObject * tmp = self->bamcigar;
     Py_INCREF(new_cigar);
     self->bamcigar = (PyObject *)new_cigar;
-    self->n_cigar_op = Py_SIZE(new_cigar);
     Py_DECREF(tmp);
     return 0;
 }
