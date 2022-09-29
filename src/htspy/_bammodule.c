@@ -745,8 +745,8 @@ BamRecord_set_cigar(BamRecord *self, BamCigar *new_cigar, void *closure) {
         return -1; 
     }
     Py_ssize_t n_cigar_op = Py_SIZE(new_cigar);
-    if (Py_SIZE(new_cigar) > 65536) {
-        self->n_cigar_op = 65536;
+    if (Py_SIZE(new_cigar) > 65535) {
+        self->n_cigar_op = 65535;
     } else {
         self->n_cigar_op = n_cigar_op;
     }
@@ -1910,9 +1910,9 @@ BamIterator_iternext(BamIterator *self){
         PyErr_SetNone(PyExc_StopIteration);
         return NULL;
     }
-    Py_ssize_t start_pos = self->pos;
+    char *record_start = self->buf + self->pos;
 
-    BamRecord * bam_record = PyObject_New(BamRecord, &BamRecord_Type);
+    BamRecord *bam_record = PyObject_New(BamRecord, &BamRecord_Type);
     bam_record->read_name = NULL;
     bam_record->seq = NULL;
     bam_record->bamcigar = NULL;
@@ -1936,43 +1936,82 @@ BamIterator_iternext(BamIterator *self){
         Py_DECREF(bam_record);
         return NULL;
     }
-    self->pos += BAM_PROPERTIES_STRUCT_SIZE;
-    bam_record->read_name = PyBytes_FromStringAndSize(
-        self->buf + self->pos, bam_record->l_read_name -1);
-    self->pos += bam_record->l_read_name;
-
+    char *name = record_start + BAM_PROPERTIES_STRUCT_SIZE;
+    uint32_t *cigar = (uint32_t *)(name + bam_record->l_read_name);
     Py_ssize_t cigar_length = bam_record->n_cigar_op * sizeof(uint32_t);
-    bam_record->bamcigar = BamCigar_FromPointerAndSize(
-        (uint32_t *)(self->buf + self->pos), bam_record->n_cigar_op);
-    self->pos += cigar_length;
-
+    char *seq = ((char *)cigar) + cigar_length;
     Py_ssize_t seq_length = (bam_record->l_seq + 1) / 2;
-    bam_record->seq = PyBytes_FromStringAndSize(
-        self->buf + self->pos, seq_length);
-    self->pos += seq_length;
-
-    bam_record->qual = PyBytes_FromStringAndSize(
-        self->buf + self->pos, bam_record->l_seq);
-    self->pos += bam_record->l_seq;
-
+    char *qual = seq + seq_length;
+    uint8_t *tags = (uint8_t *)qual + bam_record->l_seq;
     // Tags are in the remaining block of data.
-    Py_ssize_t tags_length = start_pos + record_length - self->pos;
-    bam_record->tags = PyBytes_FromStringAndSize(
-        self->buf + self-> pos, tags_length);
-    
-    // Should be equal to record_length
-    self->pos += tags_length;
+    Py_ssize_t tags_length = record_start + record_length - (char *)tags;
 
+    bam_record->read_name = PyBytes_FromStringAndSize(name, bam_record->l_read_name -1);
+
+    if ((bam_record->n_cigar_op == 0) || 
+        (bam_record->refID < 0) || 
+        (bam_record->pos < 0)) {
+            bam_record->bamcigar = BamCigar_FromPointerAndSize(NULL, 0);
+    } else {
+        if ((bam_cigar_op(cigar[0]) == BAM_CSOFT_CLIP) && 
+                (bam_cigar_oplen(cigar[0]) == bam_record->l_seq)) {
+            const uint8_t *cg_tag = NULL;
+            if (find_tag(tags, tags_length,(uint8_t *)"CG", &cg_tag) !=0) {
+                goto error;
+            }
+            if (cg_tag != NULL) {
+                if (cg_tag[2] != 'B' || cg_tag[3] != 'I') {
+                    PyErr_Format(PyExc_ValueError, 
+                                    "corrupted CG tag for %S", 
+                                    bam_record->read_name);
+                    goto error;
+                }
+                uint32_t cigar_size = ((uint32_t *)cg_tag)[1];
+                bam_record->bamcigar = BamCigar_FromPointerAndSize(
+                    (uint32_t *)(cg_tag + 8), cigar_size);
+                
+                Py_ssize_t before_cg_length = cg_tag - tags;
+                const uint8_t *after_cg = cg_tag + 8 + cigar_size * sizeof(uint32_t);
+                Py_ssize_t after_cg_length = tags_length - (after_cg - tags);
+                Py_ssize_t new_tag_length = before_cg_length + after_cg_length;
+                bam_record->tags = PyBytes_FromStringAndSize(NULL, new_tag_length);
+                if (bam_record -> tags == NULL) {
+                    PyErr_NoMemory();
+                    goto error;
+                }
+                uint8_t *tag_ptr = (uint8_t *)PyBytes_AS_STRING(bam_record->tags);
+                memcpy(tag_ptr, tags, before_cg_length);
+                memcpy(tag_ptr, after_cg, after_cg_length);
+            } else {
+                bam_record->bamcigar = BamCigar_FromPointerAndSize(
+                cigar, bam_record->n_cigar_op);
+            }
+        } else {
+            bam_record->bamcigar = BamCigar_FromPointerAndSize(
+            cigar, bam_record->n_cigar_op);
+        }
+    }
+    
+    bam_record->seq = PyBytes_FromStringAndSize(seq, seq_length);
+    bam_record->qual = PyBytes_FromStringAndSize(qual, bam_record->l_seq);
+    if (bam_record->tags == NULL) {
+        bam_record->tags = PyBytes_FromStringAndSize((char *)tags, tags_length);
+    }
+  
     // Check if any of the bytes objects was NULL. This means there was 
     // no memory available.
     if ((bam_record->read_name == NULL) | (bam_record->tags == NULL) |
         (bam_record->seq == NULL) | (bam_record->qual == NULL) |
         (bam_record->tags == NULL)) {
-        Py_DECREF(bam_record);
-        return PyErr_NoMemory();
+            PyErr_NoMemory();
+            goto error;
     }
-
+    // Jump to the next record.
+    self->pos += record_length;
     return (PyObject *)bam_record;
+error:
+    Py_DECREF(bam_record);
+    return NULL;
 }
 
 static PyTypeObject BamIterator_Type = {
