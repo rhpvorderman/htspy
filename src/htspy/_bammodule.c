@@ -500,7 +500,6 @@ static PyTypeObject BamCigar_Type = {
 };
 
 typedef struct {
-    PyObject_HEAD
     uint32_t block_size;
     int32_t refID; 
     int32_t pos; 
@@ -513,8 +512,19 @@ typedef struct {
     int32_t next_refID;
     int32_t next_pos;
     int32_t tlen;
-    // The compiler automatically inserts 4 padding bytes here to properly
-    // align the PyObject pointers in memory.
+} BamRecordMeta;
+
+typedef struct {
+    PyObject_HEAD
+    int32_t refID; 
+    int32_t pos; 
+    uint8_t mapq;
+    uint16_t bin;
+    uint16_t flag; 
+    uint32_t l_seq;
+    int32_t next_refID;
+    int32_t next_pos;
+    int32_t tlen;
     PyObject * read_name;
     PyObject * bamcigar;
     PyObject * seq;
@@ -580,10 +590,8 @@ BamRecord_init(BamRecord *self, PyObject *args, PyObject *kwargs) {
     }
     self->refID = reference_id;
     self->pos = position;
-    self->l_read_name = PyBytes_GET_SIZE(read_name) + 1;
     self->mapq = mapping_quality;
     self->bin = 0;
-    self->n_cigar_op = 0;
     self->flag = flag;
     self->l_seq = 0;
     self->next_refID = next_reference_id;
@@ -594,9 +602,6 @@ BamRecord_init(BamRecord *self, PyObject *args, PyObject *kwargs) {
     self->seq = PyBytes_FromStringAndSize("", 0);
     self->qual = PyBytes_FromStringAndSize("", 0);
     self->tags = PyBytes_FromStringAndSize("", 0);
-    self->block_size = (32 + self->l_read_name + (self->l_seq + 1 / 2) + 
-                        self->l_seq + self->n_cigar_op * 4 + 
-                        PyBytes_GET_SIZE(self->tags));
     return 0;
 }
 
@@ -606,13 +611,10 @@ static PyMemberDef BamRecord_members[] = {
     // This way we communicate to the user that they are internal and readonly 
     // while still providing full access for power users. We also circumvent 
     // the dilemma BAM spec names vs Pythonic readable names.
-    {"_block_size", T_UINT, offsetof(BamRecord, block_size), READONLY},
     {"_refID", T_INT, offsetof(BamRecord, refID), READONLY},
     {"_pos", T_INT, offsetof(BamRecord, pos), READONLY},
-    {"_l_read_name", T_UBYTE, offsetof(BamRecord, l_read_name), READONLY},
     {"_mapq", T_UBYTE, offsetof(BamRecord, mapq), READONLY},
     {"_bin", T_USHORT, offsetof(BamRecord, bin), READONLY},
-    {"_n_cigar_op", T_USHORT, offsetof(BamRecord, n_cigar_op), READONLY},
     {"_flag", T_USHORT, offsetof(BamRecord, flag), READONLY},
     {"_l_seq", T_UINT, offsetof(BamRecord, l_seq), READONLY},
     {"_next_refID", T_INT, offsetof(BamRecord, next_refID), READONLY},
@@ -672,9 +674,6 @@ BamRecord_set__read_name(BamRecord * self, PyObject * new_read_name, void* closu
     self->read_name = new_read_name;
     Py_DECREF(old_read_name);
     // Make sure the internal sizes are correct after updating.
-    uint8_t old_l_read_name = self->l_read_name;
-    self->l_read_name = (uint8_t)read_name_size + 1;
-    self->block_size = self->block_size + self->l_read_name - old_l_read_name;
     return 0;
 }
 
@@ -724,7 +723,6 @@ BamRecord_set_tags(BamRecord * self, PyObject * new_tags, void* closure)
     self->tags = new_tags;
     Py_DECREF(old_tags);
     // Make sure the internal sizes are correct after updating.
-    self->block_size = self->block_size + new_tags_size - old_tags_size;
     return 0;
 }
 
@@ -744,13 +742,7 @@ BamRecord_set_cigar(BamRecord *self, BamCigar *new_cigar, void *closure) {
             Py_TYPE(new_cigar)->tp_name);
         return -1; 
     }
-    Py_ssize_t n_cigar_op = Py_SIZE(new_cigar);
-    if (Py_SIZE(new_cigar) > 65535) {
-        self->n_cigar_op = 65535;
-    } else {
-        self->n_cigar_op = n_cigar_op;
-    }
-    PyObject * tmp = self->bamcigar;
+    PyObject *tmp = self->bamcigar;
     Py_INCREF(new_cigar);
     self->bamcigar = (PyObject *)new_cigar;
     Py_DECREF(tmp);
@@ -983,8 +975,6 @@ BamRecord_set_sequence(BamRecord *self, PyObject *const *args, Py_ssize_t nargs)
     self->seq = encoded_sequence;
     self->qual = new_qualities;
     self->l_seq = sequence_length;
-    self->block_size = self->block_size + sequence_length + encoded_length - 
-        (old_l_seq + old_encoded_length);
     Py_DECREF(old_sequence);
     Py_DECREF(old_qualities);
     Py_RETURN_NONE;
@@ -1432,12 +1422,6 @@ static int _BamRecord_replace_tag(BamRecord *self,
                           after_tag_length + 
                           tag_marker_length + 
                           tag_value_length;
-    size_t old_block_size = self->block_size;
-    size_t new_block_size = old_block_size + new_size - tags_length;
-    if (new_block_size > UINT32_MAX) {
-        PyErr_SetString(PyExc_OverflowError, "Value too big to store in BamRecord");
-        return -1;
-    }
     PyObject *tmp = PyBytes_FromStringAndSize(NULL, new_size);
     if (tmp == NULL) {
         PyErr_NoMemory();
@@ -1453,7 +1437,6 @@ static int _BamRecord_replace_tag(BamRecord *self,
     memcpy(new_tags, tag_value, tag_value_length);
     PyObject *old_tag_object = self->tags;
     self->tags = tmp;
-    self->block_size = new_block_size;
     Py_DECREF(old_tag_object);
     return 0;
 }
@@ -1919,26 +1902,35 @@ BamIterator_iternext(BamIterator *self){
     bam_record->qual = NULL;
     bam_record->tags = NULL;
 
-    if ((self->len - self->pos) < BAM_PROPERTIES_STRUCT_SIZE) {
+    if ((self->len - self->pos) < sizeof(BamRecordMeta)) {
         PyErr_SetString(PyExc_EOFError, "Truncated BAM record");
         Py_DECREF(bam_record);
         return NULL;
     }
-    // Copy the bam file data directly into the struct.
-    memcpy((char *)bam_record + BAM_PROPERTIES_STRUCT_START,
-            self->buf + self->pos,
-            BAM_PROPERTIES_STRUCT_SIZE);
+    BamRecordMeta *bam_meta = (BamRecordMeta *)record_start;
+    uint32_t block_size = bam_meta->block_size;
 
     // Block_size is excluding the block_size field it self.
-    Py_ssize_t record_length = bam_record->block_size + 4;
+    Py_ssize_t record_length = block_size + 4;
     if (self->pos + record_length > self->len) {
         PyErr_SetString(PyExc_EOFError, "Truncated BAM record");
         Py_DECREF(bam_record);
         return NULL;
     }
-    char *name = record_start + BAM_PROPERTIES_STRUCT_SIZE;
-    uint32_t *cigar = (uint32_t *)(name + bam_record->l_read_name);
-    Py_ssize_t cigar_length = bam_record->n_cigar_op * sizeof(uint32_t);
+    bam_record->refID = bam_meta->refID;
+    bam_record->pos = bam_meta->pos;
+    uint32_t l_read_name = bam_meta->l_read_name;
+    bam_record->mapq = bam_meta->mapq;
+    bam_record->bin = bam_meta->bin;
+    uint32_t n_cigar_op = bam_meta->n_cigar_op;
+    bam_record->flag = bam_meta->flag;
+    bam_record->l_seq = bam_meta->l_seq;
+    bam_record->next_refID = bam_meta->refID;
+    bam_record->next_pos = bam_meta->pos;
+    bam_record->tlen = bam_meta->tlen;
+    char *name = record_start + sizeof(BamRecordMeta);
+    uint32_t *cigar = (uint32_t *)(name + l_read_name);
+    Py_ssize_t cigar_length = n_cigar_op * sizeof(uint32_t);
     char *seq = ((char *)cigar) + cigar_length;
     Py_ssize_t seq_length = (bam_record->l_seq + 1) / 2;
     char *qual = seq + seq_length;
@@ -1946,9 +1938,9 @@ BamIterator_iternext(BamIterator *self){
     // Tags are in the remaining block of data.
     Py_ssize_t tags_length = record_start + record_length - (char *)tags;
 
-    bam_record->read_name = PyBytes_FromStringAndSize(name, bam_record->l_read_name -1);
+    bam_record->read_name = PyBytes_FromStringAndSize(name, l_read_name -1);
 
-    if ((bam_record->n_cigar_op == 0) || 
+    if ((n_cigar_op == 0) || 
         (bam_record->refID < 0) || 
         (bam_record->pos < 0)) {
             bam_record->bamcigar = BamCigar_FromPointerAndSize(NULL, 0);
@@ -1984,11 +1976,11 @@ BamIterator_iternext(BamIterator *self){
                 memcpy(tag_ptr, after_cg, after_cg_length);
             } else {
                 bam_record->bamcigar = BamCigar_FromPointerAndSize(
-                cigar, bam_record->n_cigar_op);
+                cigar, n_cigar_op);
             }
         } else {
             bam_record->bamcigar = BamCigar_FromPointerAndSize(
-            cigar, bam_record->n_cigar_op);
+            cigar, n_cigar_op);
         }
     }
     
