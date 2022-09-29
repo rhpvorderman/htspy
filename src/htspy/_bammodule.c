@@ -317,8 +317,8 @@ PyDoc_STRVAR(BamCigar_from_buffer__doc__,
 "\n"
 "Create a new BamCigar from an object that supports the buffer protocol.\n"
 "\n"
-"Objects that support the buffer protocol include bytes, bytesarray, array.array,\n"
-"numpy arrays and others."
+"Objects that support the buffer protocol include Cigar objects, bytes, \n"
+"bytesarray, array.array, numpy arrays and others.\n"
 );
 
 #define BAM_CIGAR_FROM_BUFFER_METHODDEF    \
