@@ -40,6 +40,8 @@
 
 #define BGZF_BLOCK_SIZE 0xff00  // From bgzf.h
 
+static PyObject *BamFormatError;
+
 typedef struct {
     PyObject_VAR_HEAD
     uint32_t cigar[0];
@@ -1564,7 +1566,7 @@ static int _BamRecord_set_tag(BamRecord *self,
             tag_value_size = StorePyObjectValue_I(value, tag_value_store, tag);
             break;
         case 'f':
-            dbl = PyFloat_AsDouble(value);
+       BamRecord_to_ptr     dbl = PyFloat_AsDouble(value);
             if ((dbl == -1.0L) && PyErr_Occurred()) {
                 return -1;
             }
@@ -1670,24 +1672,69 @@ static PyObject *BamRecord_set_tag(BamRecord *self, PyObject *args, PyObject *kw
 }
 
 
-static void
-BamRecord_to_ptr(BamRecord *self, char * dest) {
-    memcpy(dest, (char *)self + BAM_PROPERTIES_STRUCT_START,
-         BAM_PROPERTIES_STRUCT_SIZE);
-    Py_ssize_t cursor = BAM_PROPERTIES_STRUCT_SIZE;
-    
+/**
+ * @brief Write Bamrecord to a pointer. Return 0 when dest_size is to small, 
+ * -1 on error.
+ * 
+ * @param self The BamRecord to be written.
+ * @param dest The pointer to write to.
+ * @param dest_size The size of the destination.
+ * @return ssize_t Number of bytes written. 0 when dest_size too small. -1 on error. 
+ */
+static ssize_t
+BamRecord_to_ptr(BamRecord *self, uint8_t *dest, size_t dest_size) {
     Py_ssize_t read_name_size = PyBytes_GET_SIZE(self->read_name);
-    memcpy(dest + cursor, PyBytes_AS_STRING(self->read_name), read_name_size);
+    char *read_name = PyBytes_AS_STRING(self->read_name);
+    Py_ssize_t cigar_size = Py_SIZE(self->bamcigar);
+    uint32_t *cigar = BamCigar_GET_CIGAR(self->bamcigar);
+    Py_ssize_t seq_size = PyBytes_GET_SIZE(self->seq);
+    char *seq = PyBytes_AS_STRING(self->seq);
+    Py_ssize_t qual_size = PyBytes_GET_SIZE(self->qual);
+    char *qual = PyBytes_AS_STRING(self->qual);
+    Py_ssize_t tag_size = PyBytes_GET_SIZE(self->tags);
+    char *tags = PyBytes_AS_STRING(self->tags);
+    size_t block_size = sizeof(BamRecordMeta) + 
+                        read_name_size + 1 +
+                        seq_size +
+                        qual_size +
+                        cigar_size * sizeof(uint32_t) + 
+                        tag_size; 
+    if (cigar_size > UINT16_MAX) {
+        block_size += 16;  // 8 for fake cigar + 8 for extra tag
+    };
+    if (block_size > UINT32_MAX) {
+        PyErr_Format(
+            BamFormatError, 
+            "BamRecord with name %R needs more than %ud bytes for storage. "
+            "Consider using SAM or CRAM format.", 
+            self->read_name, UINT32_MAX);
+        return -1;
+    }
+    if (block_size > dest_size) {
+        return 0;
+    }
+    BamRecordMeta *bam_meta = (BamRecordMeta *)dest;
+    bam_meta->block_size = block_size;
+    bam_meta->refID = self->refID;
+    bam_meta->pos = self->pos;
+    bam_meta->mapq;
+    bam_meta->bin;
+    bam_meta->flag;
+    bam_meta->l_seq;
+    bam_meta->next_refID;
+    bam_meta->next_pos;
+    bam_meta->tlen;
+    
+    memcpy(dest + cursor, ;
     cursor += read_name_size;
 
     // Terminate read_name with NULL byte
     dest[cursor] = 0; cursor += 1;
 
-    Py_ssize_t cigar_char_size = Py_SIZE(self->bamcigar) * sizeof(uint32_t);
-    memcpy(dest + cursor, BamCigar_GET_CIGAR(self->bamcigar), cigar_char_size);
+    memcpy(dest + cursor,, cigar_char_size);
     cursor += cigar_char_size;
 
-    Py_ssize_t seq_size = PyBytes_GET_SIZE(self->seq);
+    Py_ssize_t seq_size = 
     memcpy(dest + cursor, PyBytes_AS_STRING(self->seq), seq_size);
     cursor += seq_size;
 
@@ -2063,6 +2110,10 @@ PyInit__bam(void)
     if (m == NULL)
         return NULL;
 
+    BamFormatError = PyErr_NewException("_bam.BamFormatError", NULL, NULL);
+    if (BamFormatError == NULL) {
+        return NULL;
+    }
     if (PyType_Ready(&BamIterator_Type) < 0)
         return NULL;
     PyObject * BamiteratorType = (PyObject *)&BamIterator_Type;
